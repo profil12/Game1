@@ -1,0 +1,74 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Minecraft Ферма | Дни, ночи, зомби сгорают</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="game-container">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+    <!-- Статистика -->
+    <div class="stats-bar">
+        <div class="stat health"><span>❤️</span> <span id="healthValue">20</span></div>
+        <div class="stat hunger"><span>🍗</span> <span id="hungerValue">20</span></div>
+        <div class="stat day"><span id="dayIcon">🌞</span> <span id="dayPhase">День</span></div>
+        <div class="stat time"><span>⏱️</span> <span id="timeLeft">45с</span></div>
+        <div class="stat"><span>🎁</span> <span id="bonusTime">60с</span></div>
+        <div class="stat"><span>📆</span> <span id="nightCount">Ночь 0</span></div>
+        <div class="stat inv-btn" id="inventoryToggleBtn"><span>🎒</span> <span>Инвентарь (I)</span></div>
+    </div>
+
+    <!-- Ресурсы -->
+    <div class="inventory">
+        <div class="resource-card"><span>🪵</span> <span id="woodCount">5</span></div>
+        <div class="resource-card"><span>🪨</span> <span id="stoneCount">3</span></div>
+        <div class="resource-card"><span>🍎</span> <span id="foodCount">10</span></div>
+        <div class="resource-card"><span>🔥</span> <span id="coalCount">0</span></div>
+        <div class="resource-card"><span>🟤</span> <span id="copperCount">0</span></div>
+        <div class="resource-card"><span>⚙️</span> <span id="ironCount">0</span></div>
+        <div class="resource-card"><span>🏹</span> <span id="arrowCount">0</span></div>
+        <div class="resource-card"><span>⚒️</span> <span id="toolLevel">Деревянная</span></div>
+        <div class="resource-card"><span>🗡️</span> <span id="weaponName">Кирка</span></div>
+    </div>
+
+    <!-- Крафт -->
+    <div class="crafting-panel">
+        <div class="craft-header">🪵 ВЕРСТАК 🪵</div>
+        <div class="craft-grid" id="craftGrid"></div>
+    </div>
+
+    <div class="action-buttons">
+        <button class="action-btn" id="actionBtn">⛏️ ДЕЙСТВИЕ (E)</button>
+        <button class="action-btn" id="furnaceBtn">🔥 ПЕЧЬ</button>
+        <button class="action-btn" id="inventoryBtn">🎒 ИНВЕНТАРЬ (I)</button>
+    </div>
+    <div class="controls-hint">
+        🕹️ WASD / стрелки — движение | E / Пробел — действие | I — инвентарь<br>
+        🎯 Клик по зомби — выстрел из лука/арбалета
+    </div>
+</div>
+
+<!-- Инвентарь -->
+<div id="inventoryModal" class="inventory-modal">
+    <div class="inventory-modal-content">
+        <div class="inventory-modal-header">
+            <h2>🎒 ИНВЕНТАРЬ</h2>
+            <button id="closeInventoryBtn" class="close-inv">✖️</button>
+        </div>
+        <div class="inventory-slots" id="inventorySlots"></div>
+        <div class="inventory-equip">
+            <div class="equipped-info">
+                <p>⚒️ Экипированная кирка: <span id="equippedTool">Деревянная</span></p>
+                <p>🗡️ Экипированное оружие: <span id="equippedWeapon">Кирка (3 урона)</span></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
