@@ -1,16 +1,19 @@
-// File: script.js
 (function(){
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
-    const TILE_SIZE = 50;
+    const TILE_SIZE = 56;  // 900/16 ≈ 56, 650/12 ≈ 54 -> берём 54 для ровности
     const MAP_WIDTH = 16;
     const MAP_HEIGHT = 12;
+    
+    // Пересчитываем размер canvas под TILE_SIZE
+    canvas.width = MAP_WIDTH * TILE_SIZE;
+    canvas.height = MAP_HEIGHT * TILE_SIZE;
 
     // ========== СОСТОЯНИЕ ИГРОКА ==========
     let player = { x: 8, y: 6, health: 20, maxHealth: 20, hunger: 20, maxHunger: 20 };
     let wood = 5, stone = 3, food = 10, coal = 0, copper = 0, iron = 0;
     let arrows = 0;
-    let survivedNights = 0;  // сколько ночей пережил
+    let survivedNights = 0;
     
     // ИНВЕНТАРЬ
     let availableTools = [
@@ -20,7 +23,7 @@
         { id: "iron_pick", name: "Железная кирка", type: "tool", tier: 4, icon: "⚙️", damage: 9, crafted: false }
     ];
     let availableWeapons = [
-        { id: "melee_default", name: "Кирка (оружие)", type: "weapon", damage: 3, icon: "⛏️", crafted: true },
+        { id: "melee_default", name: "Кирка", type: "weapon", damage: 3, icon: "⛏️", crafted: true },
         { id: "copper_sword", name: "Медный меч", type: "weapon", damage: 6, icon: "🗡️", crafted: false },
         { id: "iron_sword", name: "Железный меч", type: "weapon", damage: 9, icon: "⚔️", crafted: false },
         { id: "bow", name: "Лук", type: "ranged", damage: 8, icon: "🏹", crafted: false, needsArrows: true },
@@ -36,9 +39,9 @@
     // ========== МИР ==========
     let worldMap = Array(MAP_HEIGHT).fill().map(() => Array(MAP_WIDTH).fill().map(() => ({ type: 0, health: 0, maxHealth: 0, respawnTimer: null })));
     let zombies = [];
-    let nightCount = 1;      // номер текущей ночи (для спавна)
+    let nightCount = 1;
     
-    let dayTime = 0;         // 0-день, 1-ночь
+    let dayTime = 0;
     let cycleSeconds = 0;
     let lastTick = Date.now();
     let gameActive = true;
@@ -84,7 +87,7 @@
         if(tool && tool.crafted !== false) {
             equippedToolId = id;
             updateEquippedStats();
-            showFloatingText(`⚒️ Экипирована ${tool.name}`, player.x, player.y, "#aaffaa");
+            showFloatingText(`⚒️ ${tool.name}`, player.x, player.y, "#aaffaa");
             renderInventoryUI();
         }
     }
@@ -99,7 +102,7 @@
                 currentWeaponMode = "melee";
             }
             updateEquippedStats();
-            showFloatingText(`🗡️ Экипировано ${weapon.name}`, player.x, player.y, "#aaffaa");
+            showFloatingText(`🗡️ ${weapon.name}`, player.x, player.y, "#aaffaa");
             renderInventoryUI();
         }
     }
@@ -167,7 +170,7 @@
         let tool = getToolById(equippedToolId);
         document.getElementById('toolLevel').innerHTML = tool ? tool.name : "Деревянная";
         let weapon = getWeaponById(equippedWeaponId);
-        document.getElementById('weaponName').innerHTML = weapon ? `${weapon.name} (${weaponDamage} урона)` : "Кирка";
+        document.getElementById('weaponName').innerHTML = weapon ? `${weapon.name} (${weaponDamage})` : "Кирка";
         let remaining = 45 - cycleSeconds;
         document.getElementById('timeLeft').innerHTML = remaining + "с";
         document.getElementById('dayIcon').innerHTML = dayTime===0 ? "🌞" : "🌙";
@@ -197,7 +200,7 @@
         bonusChest.x = pos.x;
         bonusChest.y = pos.y;
         bonusChest.spawnTimer = 60;
-        showFloatingText("✨ Бонусный сундук появился! ✨", pos.x, pos.y, "#ffaa44");
+        showFloatingText("✨ Бонусный сундук!", pos.x, pos.y, "#ffaa44");
         drawGame();
     }
 
@@ -209,7 +212,7 @@
             if(reward < 0.3) { arrows += 15; msg = "🏹 +15 стрел"; }
             else if(reward < 0.55) { food += 12; msg = "🍎 +12 еды"; }
             else if(reward < 0.75) { coal += 10; msg = "🔥 +10 угля"; }
-            else { iron += 3; copper += 4; msg = "⚙️ +3 железо, +4 медь"; }
+            else { iron += 3; copper += 4; msg = "⚙️ +3 жел, +4 мед"; }
             showFloatingText(msg, bonusChest.x, bonusChest.y, "#aaffaa");
             bonusChest.active = false;
             updateUI();
@@ -276,7 +279,6 @@
                     let r = Math.random();
                     if(r<0.3) { arrows+=12; showFloatingText("🏹 +12 стрел", bx, by, "#aaffaa"); }
                     else if(r<0.5) { food+=8; showFloatingText("🍎 +8 еды", bx, by, "#aaffaa"); }
-                    else if(r<0.7 && toolTier<4) { }
                     else { coal+=5; showFloatingText("🔥 +5 угля", bx, by, "#aaffaa"); }
                 }
             }
@@ -292,7 +294,7 @@
 
     function rangedAttack(targetX, targetY){
         if(!gameActive) return;
-        if(currentWeaponMode === "melee") { showFloatingText("Смени оружие на лук/арбалет", player.x, player.y, "#ff8888"); return; }
+        if(currentWeaponMode === "melee") { showFloatingText("Смени на лук/арбалет", player.x, player.y, "#ff8888"); return; }
         if(arrows <= 0) { showFloatingText("Нет стрел!", player.x, player.y, "#ff8888"); return; }
         let targetZombie = null;
         for(let z of zombies){
@@ -317,8 +319,8 @@
     function smeltInFurnace(){
         if(!gameActive) return;
         if(coal>0){
-            if(copper>=2){ copper-=2; iron+=1; showFloatingText("⚙️ Железо выплавлено", player.x, player.y, "#ccccaa"); coal--; updateUI(); drawGame(); return; }
-            if(copper>=1){ copper--; showFloatingText("🟤 Медь переплавлена", player.x, player.y, "#ccccaa"); coal--; updateUI(); drawGame(); return; }
+            if(copper>=2){ copper-=2; iron+=1; showFloatingText("⚙️ Железо", player.x, player.y, "#ccccaa"); coal--; updateUI(); drawGame(); return; }
+            if(copper>=1){ copper--; showFloatingText("🟤 Медь", player.x, player.y, "#ccccaa"); coal--; updateUI(); drawGame(); return; }
             showFloatingText("Нет руды", player.x, player.y, "#ffaaaa");
         } else {
             showFloatingText("Нет угля!", player.x, player.y, "#ffaaaa");
@@ -343,27 +345,23 @@
             if(mat==='copper') copper-=amt;
             if(mat==='food') food-=amt;
         }
-        if(recipe.result.toolId){ unlockTool(recipe.result.toolId); showFloatingText(`✨ Выкрафчена ${getToolById(recipe.result.toolId).name}`, player.x, player.y, "#aaffaa"); }
-        if(recipe.result.weaponId){ unlockWeapon(recipe.result.weaponId); showFloatingText(`✨ Выкрафчен ${getWeaponById(recipe.result.weaponId).name}`, player.x, player.y, "#aaffaa"); }
+        if(recipe.result.toolId){ unlockTool(recipe.result.toolId); showFloatingText(`✨ ${getToolById(recipe.result.toolId).name}`, player.x, player.y, "#aaffaa"); }
+        if(recipe.result.weaponId){ unlockWeapon(recipe.result.weaponId); showFloatingText(`✨ ${getWeaponById(recipe.result.weaponId).name}`, player.x, player.y, "#aaffaa"); }
         if(recipe.result.extraArrows){ arrows += recipe.result.extraArrows; showFloatingText(`🏹 +${recipe.result.extraArrows} стрел`, player.x, player.y, "#aaffaa"); }
-        if(recipe.result.hungerHeal){ player.hunger = Math.min(player.maxHunger, player.hunger+recipe.result.hungerHeal); showFloatingText("🍞 Голод восст.", player.x, player.y, "#aaffaa"); }
+        if(recipe.result.hungerHeal){ player.hunger = Math.min(player.maxHunger, player.hunger+recipe.result.hungerHeal); showFloatingText("🍞 Голод", player.x, player.y, "#aaffaa"); }
         updateUI(); drawGame();
         renderInventoryUI();
     }
 
-    // Зомби сгорают на рассвете
     function burnZombiesAtSunrise() {
-        if(dayTime === 0 && cycleSeconds < 3) { // первые 3 секунды дня
-            let burned = false;
+        if(dayTime === 0 && cycleSeconds < 3) {
             for(let i=0; i<zombies.length; i++){
                 zombies[i].health -= 5;
                 if(zombies[i].health <= 0){
                     zombies.splice(i,1);
                     i--;
-                    burned = true;
                 }
             }
-            if(burned) showFloatingText("🔥 Зомби сгорают на солнце!", player.x, player.y, "#ffaa66");
         }
     }
 
@@ -397,16 +395,11 @@
                 }
                 updateUI();
             }
-            // Зомби сгорают на рассвете
-            if(wasNight && dayTime === 0) {
-                burnZombiesAtSunrise();
-            }
+            if(wasNight && dayTime === 0) burnZombiesAtSunrise();
             
             if(!bonusChest.active){
                 bonusChest.spawnTimer -= 1;
-                if(bonusChest.spawnTimer <= 0){
-                    spawnBonusChest();
-                }
+                if(bonusChest.spawnTimer <= 0) spawnBonusChest();
                 updateUI();
             }
             if(dayTime===0 && Math.random()<0.4 && player.hunger>0) player.hunger = Math.max(0, player.hunger-1);
@@ -440,7 +433,6 @@
         div.innerHTML = `<div class="death-card">
             <div>💀 ВЫ ПОГИБЛИ 💀</div>
             <div style="margin-top:15px;">📆 Выжито дней: ${survivedNights}</div>
-            <div style="margin-top:10px; font-size:0.8rem;">Ночной зомби-апокалипсис...</div>
             <button id="restartBtn">Играть снова</button>
         </div>`;
         document.body.appendChild(div);
@@ -457,7 +449,7 @@
                 const slot = document.createElement('div');
                 slot.className = 'inv-slot';
                 if(equippedToolId === tool.id) slot.classList.add('equipped');
-                slot.innerHTML = `<div class="inv-slot-icon">${tool.icon}</div><div class="inv-slot-name">${tool.name}</div><div class="inv-slot-damage">${tool.damage} урона</div>`;
+                slot.innerHTML = `<div class="inv-slot-icon">${tool.icon}</div><div class="inv-slot-name">${tool.name}</div><div class="inv-slot-damage">${tool.damage}</div>`;
                 slot.onclick = () => equipTool(tool.id);
                 slotsContainer.appendChild(slot);
             }
@@ -467,14 +459,14 @@
                 const slot = document.createElement('div');
                 slot.className = 'inv-slot';
                 if(equippedWeaponId === weapon.id) slot.classList.add('equipped');
-                slot.innerHTML = `<div class="inv-slot-icon">${weapon.icon}</div><div class="inv-slot-name">${weapon.name}</div><div class="inv-slot-damage">${weapon.damage} урона</div>`;
+                slot.innerHTML = `<div class="inv-slot-icon">${weapon.icon}</div><div class="inv-slot-name">${weapon.name}</div><div class="inv-slot-damage">${weapon.damage}</div>`;
                 slot.onclick = () => equipWeapon(weapon.id);
                 slotsContainer.appendChild(slot);
             }
         });
         document.getElementById('equippedTool').innerHTML = getToolById(equippedToolId)?.name || "Деревянная";
         let wep = getWeaponById(equippedWeaponId);
-        document.getElementById('equippedWeapon').innerHTML = wep ? `${wep.name} (${wep.damage} урона)` : "Кирка (3 урона)";
+        document.getElementById('equippedWeapon').innerHTML = wep ? `${wep.name}` : "Кирка";
     }
 
     function openInventory() { renderInventoryUI(); document.getElementById('inventoryModal').style.display = 'flex'; }
@@ -548,64 +540,164 @@
         }
     }
 
-    // Движение
-    let moveDir={x:0,y:0}, lastMove=0;
-    function tryMove(dx,dy){
+    // ========== ДВИЖЕНИЕ (ПК + телефоны) ==========
+    let moveDir = { x: 0, y: 0 };
+    let lastMove = 0;
+    
+    function tryMove(dx, dy) {
         if(!gameActive) return false;
-        let nx=player.x+dx, ny=player.y+dy;
-        if(nx>=0 && nx<MAP_WIDTH && ny>=0 && ny<MAP_HEIGHT){
-            player.x=nx; player.y=ny;
+        let nx = player.x + dx;
+        let ny = player.y + dy;
+        if(nx >= 0 && nx < MAP_WIDTH && ny >= 0 && ny < MAP_HEIGHT) {
+            player.x = nx;
+            player.y = ny;
             drawGame();
             return true;
         }
         return false;
     }
-    function updateMovement(){
-        if(!gameActive) return;
-        if(moveDir.x===0 && moveDir.y===0) return;
-        let now=Date.now();
-        if(now-lastMove>=150){
-            let dx=Math.abs(moveDir.x)>0.3?(moveDir.x>0?1:-1):0;
-            let dy=Math.abs(moveDir.y)>0.3?(moveDir.y>0?1:-1):0;
-            if(dx!==0||dy!==0) tryMove(dx,dy);
-            lastMove=now;
-        }
-        requestAnimationFrame(updateMovement);
-    }
-
-    // Джойстик
-    let joystickActive=false, joystickBase=null, joystickThumb=null, baseRect={}, maxDist=50;
-    function createJoystick(cx,cy){
-        if(joystickBase) joystickBase.remove();
-        let cont=document.createElement('div'); cont.id='joyCont'; document.body.appendChild(cont);
-        joystickBase=document.createElement('div'); joystickBase.className='joystick-base';
-        joystickThumb=document.createElement('div'); joystickThumb.className='joystick-thumb';
-        joystickBase.appendChild(joystickThumb); cont.appendChild(joystickBase);
-        let x=Math.min(window.innerWidth-140, Math.max(0,cx-70));
-        let y=Math.min(window.innerHeight-140, Math.max(0,cy-70));
-        joystickBase.style.left=x+'px'; joystickBase.style.top=y+'px';
-        let rect=joystickBase.getBoundingClientRect();
-        baseRect={cx:rect.left+rect.width/2, cy:rect.top+rect.height/2};
-        maxDist=rect.width/2-15;
-        moveDir={x:0,y:0};
-    }
-    function moveJoystick(cx,cy){
-        if(!joystickActive) return;
-        let dx=cx-baseRect.cx, dy=cy-baseRect.cy;
-        let dist=Math.min(Math.hypot(dx,dy), maxDist);
-        let ang=Math.atan2(dy,dx);
-        joystickThumb.style.left=(50+(Math.cos(ang)*(dist/maxDist)*50))+'%';
-        joystickThumb.style.top=(50+(Math.sin(ang)*(dist/maxDist)*50))+'%';
-        moveDir.x=Math.cos(ang)*(dist/maxDist);
-        moveDir.y=Math.sin(ang)*(dist/maxDist);
-        if(dist<8) moveDir={x:0,y:0};
-    }
-    function releaseJoy(){ joystickActive=false; if(joystickBase) joystickBase.remove(); joystickBase=null; moveDir={x:0,y:0}; }
-    canvas.addEventListener('touchstart',(e)=>{ e.preventDefault(); let t=e.touches[0]; createJoystick(t.clientX,t.clientY); joystickActive=true; moveJoystick(t.clientX,t.clientY); });
-    canvas.addEventListener('touchmove',(e)=>{ if(joystickActive){ e.preventDefault(); moveJoystick(e.touches[0].clientX,e.touches[0].clientY); } });
-    canvas.addEventListener('touchend',()=>releaseJoy());
     
-    canvas.addEventListener('click',(e)=>{
+    function updateMovementFromDir() {
+        if(!gameActive) return;
+        if(moveDir.x === 0 && moveDir.y === 0) return;
+        let now = Date.now();
+        if(now - lastMove >= 150) {
+            let dx = Math.abs(moveDir.x) > 0.3 ? (moveDir.x > 0 ? 1 : -1) : 0;
+            let dy = Math.abs(moveDir.y) > 0.3 ? (moveDir.y > 0 ? 1 : -1) : 0;
+            if(dx !== 0 || dy !== 0) tryMove(dx, dy);
+            lastMove = now;
+        }
+        requestAnimationFrame(updateMovementFromDir);
+    }
+    
+    // ========== ДЖОЙСТИК ДЛЯ ТЕЛЕФОНА (рабочий) ==========
+    let joystickActive = false;
+    let joystickBase = null;
+    let joystickThumb = null;
+    let joystickContainer = null;
+    let joystickCenter = { x: 0, y: 0 };
+    let joystickMaxDist = 45;
+    
+    function initJoystick() {
+        joystickContainer = document.createElement('div');
+        joystickContainer.className = 'joystick-container';
+        joystickBase = document.createElement('div');
+        joystickBase.className = 'joystick-base';
+        joystickThumb = document.createElement('div');
+        joystickThumb.className = 'joystick-thumb';
+        joystickBase.appendChild(joystickThumb);
+        joystickContainer.appendChild(joystickBase);
+        document.body.appendChild(joystickContainer);
+        
+        // Показываем джойстик при касании canvas
+        canvas.addEventListener('touchstart', onJoystickStart, { passive: false });
+        canvas.addEventListener('touchmove', onJoystickMove, { passive: false });
+        canvas.addEventListener('touchend', onJoystickEnd);
+        canvas.addEventListener('touchcancel', onJoystickEnd);
+    }
+    
+    function onJoystickStart(e) {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const rect = joystickContainer.getBoundingClientRect();
+        
+        // Позиционируем джойстик под палец
+        let x = touch.clientX - 70;
+        let y = touch.clientY - 70;
+        x = Math.min(window.innerWidth - 140, Math.max(0, x));
+        y = Math.min(window.innerHeight - 140, Math.max(20, y));
+        joystickContainer.style.left = x + 'px';
+        joystickContainer.style.top = y + 'px';
+        joystickContainer.style.display = 'block';
+        
+        // Центр джойстика
+        const containerRect = joystickContainer.getBoundingClientRect();
+        joystickCenter.x = containerRect.left + containerRect.width / 2;
+        joystickCenter.y = containerRect.top + containerRect.height / 2;
+        
+        joystickActive = true;
+        updateJoystickPosition(touch.clientX, touch.clientY);
+    }
+    
+    function onJoystickMove(e) {
+        if(!joystickActive) return;
+        e.preventDefault();
+        const touch = e.touches[0];
+        updateJoystickPosition(touch.clientX, touch.clientY);
+    }
+    
+    function updateJoystickPosition(clientX, clientY) {
+        let dx = clientX - joystickCenter.x;
+        let dy = clientY - joystickCenter.y;
+        let dist = Math.min(Math.hypot(dx, dy), joystickMaxDist);
+        let angle = Math.atan2(dy, dx);
+        let offsetX = Math.cos(angle) * dist;
+        let offsetY = Math.sin(angle) * dist;
+        
+        joystickThumb.style.transform = `translate(calc(-50% + ${offsetX}px), calc(-50% + ${offsetY}px))`;
+        
+        moveDir.x = Math.cos(angle) * (dist / joystickMaxDist);
+        moveDir.y = Math.sin(angle) * (dist / joystickMaxDist);
+        if(dist < 10) {
+            moveDir.x = 0;
+            moveDir.y = 0;
+        }
+    }
+    
+    function onJoystickEnd(e) {
+        joystickActive = false;
+        joystickContainer.style.display = 'none';
+        joystickThumb.style.transform = 'translate(-50%, -50%)';
+        moveDir.x = 0;
+        moveDir.y = 0;
+    }
+    
+    // ========== КЛАВИАТУРА ДЛЯ ПК ==========
+    let keys = {};
+    window.addEventListener('keydown', (e) => {
+        if(!gameActive) return;
+        let k = e.key.toLowerCase();
+        if(['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 's', 'a', 'd'].includes(k)) {
+            e.preventDefault();
+            keys[k] = true;
+            updateKeyboardMovement();
+        }
+        if(k === ' ' || k === 'e') {
+            e.preventDefault();
+            performAction();
+        }
+        if(k === 'i') {
+            e.preventDefault();
+            openInventory();
+        }
+    });
+    
+    window.addEventListener('keyup', (e) => {
+        let k = e.key.toLowerCase();
+        delete keys[k];
+        if(['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 's', 'a', 'd'].includes(k)) {
+            updateKeyboardMovement();
+        }
+    });
+    
+    function updateKeyboardMovement() {
+        let dx = 0, dy = 0;
+        if(keys['arrowup'] || keys['w']) dy = -1;
+        if(keys['arrowdown'] || keys['s']) dy = 1;
+        if(keys['arrowleft'] || keys['a']) dx = -1;
+        if(keys['arrowright'] || keys['d']) dx = 1;
+        
+        if(dx !== 0 || dy !== 0) {
+            let now = Date.now();
+            if(now - lastMove >= 150) {
+                tryMove(dx, dy);
+                lastMove = now;
+            }
+        }
+    }
+    
+    // Клик по зомби для стрельбы
+    canvas.addEventListener('click', (e) => {
         if(!gameActive) return;
         const rect = canvas.getBoundingClientRect();
         const scaleX = canvas.width / rect.width;
@@ -614,9 +706,9 @@
         let mouseY = (e.clientY - rect.top) * scaleY;
         let tileX = Math.floor(mouseX / TILE_SIZE);
         let tileY = Math.floor(mouseY / TILE_SIZE);
-        if(tileX>=0 && tileX<MAP_WIDTH && tileY>=0 && tileY<MAP_HEIGHT){
-            for(let z of zombies){
-                if(z.x===tileX && z.y===tileY){
+        if(tileX >= 0 && tileX < MAP_WIDTH && tileY >= 0 && tileY < MAP_HEIGHT) {
+            for(let z of zombies) {
+                if(z.x === tileX && z.y === tileY) {
                     rangedAttack(tileX, tileY);
                     return;
                 }
@@ -624,54 +716,24 @@
         }
     });
     
-    let keys={};
-    window.addEventListener('keydown',(e)=>{
-        if(!gameActive) return;
-        let k=e.key;
-        if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','w','W','s','S','a','A','d','D'].includes(k)){
-            e.preventDefault();
-            keys[k.toLowerCase()] = true;
-            updateKeys();
-        }
-        if(k===' '||k==='e'||k==='E'){
-            e.preventDefault();
-            performAction();
-        }
-        if(k==='i'||k==='I'){
-            e.preventDefault();
-            openInventory();
-        }
-    });
-    window.addEventListener('keyup',(e)=>{ delete keys[e.key.toLowerCase()]; updateKeys(); });
-    function updateKeys(){
-        let dx=0,dy=0;
-        if(keys['arrowup']||keys['w']) dy=-1;
-        if(keys['arrowdown']||keys['s']) dy=1;
-        if(keys['arrowleft']||keys['a']) dx=-1;
-        if(keys['arrowright']||keys['d']) dx=1;
-        if(dx!==0||dy!==0){
-            let now=Date.now();
-            if(now-lastMove>=150){ tryMove(dx,dy); lastMove=now; }
-        }
-    }
-
+    // Инициализация
     function renderCrafting(){
-        let grid=document.getElementById('craftGrid');
-        grid.innerHTML='';
-        recipes.forEach(rec=>{
-            let btn=document.createElement('button');
-            btn.innerText=rec.name;
-            btn.className='craft-btn';
-            btn.onclick=()=>craft(rec);
+        let grid = document.getElementById('craftGrid');
+        grid.innerHTML = '';
+        recipes.forEach(rec => {
+            let btn = document.createElement('button');
+            btn.innerText = rec.name;
+            btn.className = 'craft-btn';
+            btn.onclick = () => craft(rec);
             grid.appendChild(btn);
         });
     }
     
-    document.getElementById('actionBtn').onclick=()=>performAction();
-    document.getElementById('furnaceBtn').onclick=()=>smeltInFurnace();
-    document.getElementById('inventoryBtn').onclick=()=>openInventory();
-    document.getElementById('inventoryToggleBtn')?.addEventListener('click',()=>openInventory());
-    document.getElementById('closeInventoryBtn').onclick=()=>closeInventory();
+    document.getElementById('actionBtn').onclick = () => performAction();
+    document.getElementById('furnaceBtn').onclick = () => smeltInFurnace();
+    document.getElementById('inventoryBtn').onclick = () => openInventory();
+    document.getElementById('inventoryToggleBtn')?.addEventListener('click', () => openInventory());
+    document.getElementById('closeInventoryBtn').onclick = () => closeInventory();
     window.onclick = (e) => { let modal = document.getElementById('inventoryModal'); if(e.target === modal) closeInventory(); };
     
     generateWorld();
@@ -679,6 +741,7 @@
     updateEquippedStats();
     updateUI();
     drawGame();
-    setInterval(()=>updateGameLoop(), 50);
-    updateMovement();
+    setInterval(() => updateGameLoop(), 50);
+    updateMovementFromDir();
+    initJoystick();
 })();
