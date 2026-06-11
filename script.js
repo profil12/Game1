@@ -1,11 +1,7 @@
 (function() {
-    // Ждём загрузки страницы
     document.addEventListener('DOMContentLoaded', () => {
         const canvas = document.getElementById('gameCanvas');
-        if (!canvas) {
-            console.error("Canvas не найден!");
-            return;
-        }
+        if (!canvas) { console.error("Canvas не найден!"); return; }
         const ctx = canvas.getContext('2d');
 
         // Размеры мира
@@ -41,6 +37,7 @@
         ];
 
         function getToolById(id) { return availableTools.find(t => t.id === id); }
+        function hasWeapon(weaponId) { return availableWeapons.find(w => w.id === weaponId)?.crafted === true; }
 
         // Мир и зомби
         let worldMap = [];
@@ -50,16 +47,16 @@
         let lastTick = Date.now();
         let gameActive = true;
         let floatingMessages = [];
-        let bonusChest = { active: false, x: 0, y: 0, spawnTimer: 60 };
+        let bonusChest = { active: false, x: 0, y: 0, spawnTimer: 60, health: 6, maxHealth: 6 };
 
         const blockStats = {
-            1: { name: "дерево", baseHealth: 8, drops: { wood: 3 }, toolRequired: 1 },
-            2: { name: "камень", baseHealth: 12, drops: { stone: 2 }, toolRequired: 2 },
-            3: { name: "ягоды", baseHealth: 4, drops: { food: 4 }, toolRequired: 1 },
-            4: { name: "сундук", baseHealth: 6, drops: { random: true }, toolRequired: 1 },
-            5: { name: "уголь", baseHealth: 10, drops: { coal: 3 }, toolRequired: 2 },
-            6: { name: "медь", baseHealth: 12, drops: { copper: 2 }, toolRequired: 2 },
-            7: { name: "железо", baseHealth: 15, drops: { iron: 1 }, toolRequired: 3 }
+            1: { name: "дерево", baseHealth: 8, drops: { wood: 3 }, toolRequired: 1, icon: "🌲" },
+            2: { name: "камень", baseHealth: 12, drops: { stone: 2 }, toolRequired: 2, icon: "🪨" },
+            3: { name: "ягоды", baseHealth: 4, drops: { food: 4 }, toolRequired: 1, icon: "🍓" },
+            4: { name: "сундук", baseHealth: 6, drops: { random: true }, toolRequired: 1, icon: "📦" },
+            5: { name: "уголь", baseHealth: 10, drops: { coal: 3 }, toolRequired: 2, icon: "⚫" },
+            6: { name: "медь", baseHealth: 12, drops: { copper: 2 }, toolRequired: 2, icon: "🟤" },
+            7: { name: "железо", baseHealth: 15, drops: { iron: 1 }, toolRequired: 3, icon: "⚙️" }
         };
 
         const recipes = [
@@ -108,8 +105,14 @@
             if (get('arrowCount')) get('arrowCount').innerHTML = arrows;
             let tool = getToolById(equippedToolId);
             if (get('toolLevel')) get('toolLevel').innerHTML = tool ? tool.name : "Деревянная";
-            let weaponName = currentWeaponMode === 'melee' ? 'Кирка' : (currentWeaponMode === 'bow' ? 'Лук' : 'Арбалет');
+            
+            // Показываем только доступное оружие
+            let weaponName = "Кирка";
+            if (currentWeaponMode === 'bow' && hasWeapon('bow')) weaponName = "Лук";
+            else if (currentWeaponMode === 'crossbow' && hasWeapon('crossbow')) weaponName = "Арбалет";
+            else if (currentWeaponMode === 'melee') weaponName = "Кирка/меч";
             if (get('weaponName')) get('weaponName').innerHTML = weaponName;
+            
             if (get('timeLeft')) get('timeLeft').innerHTML = (45 - cycleSeconds) + "с";
             if (get('dayIcon')) get('dayIcon').innerHTML = dayTime === 0 ? "🌞" : "🌙";
             if (get('dayPhase')) get('dayPhase').innerHTML = dayTime === 0 ? "День" : "Ночь";
@@ -128,6 +131,25 @@
         function harvestBlock() {
             if (!worldMap.length) return;
             let bx = player.x, by = player.y;
+            
+            // Проверяем бонусный сундук
+            if (bonusChest.active && bx === bonusChest.x && by === bonusChest.y) {
+                bonusChest.health -= (getToolById(equippedToolId)?.damage || 2);
+                showFloatingText(`💥 Сундук: ${bonusChest.health}/${bonusChest.maxHealth}`, bx, by, "#ffaa66");
+                if (bonusChest.health <= 0) {
+                    // Бонусы из сундука
+                    let r = Math.random();
+                    if (r < 0.3) { arrows += 15; showFloatingText("🏹 +15 стрел!", bx, by, "#aaffaa"); }
+                    else if (r < 0.6) { food += 12; showFloatingText("🍎 +12 еды!", bx, by, "#aaffaa"); }
+                    else { coal += 10; showFloatingText("🔥 +10 угля!", bx, by, "#aaffaa"); }
+                    bonusChest.active = false;
+                    bonusChest.spawnTimer = 60;
+                    updateUI();
+                }
+                drawGame();
+                return;
+            }
+            
             let block = worldMap[by]?.[bx];
             if (!block || block.type === 0) {
                 showFloatingText("🌿 Пусто", bx, by, "#aaa");
@@ -188,6 +210,14 @@
                 showFloatingText("❌ Смени оружие на лук/арбалет", player.x, player.y, "#ff8888");
                 return false;
             }
+            if (currentWeaponMode === 'bow' && !hasWeapon('bow')) {
+                showFloatingText("❌ У вас нет лука! Скрафтите его", player.x, player.y, "#ff8888");
+                return false;
+            }
+            if (currentWeaponMode === 'crossbow' && !hasWeapon('crossbow')) {
+                showFloatingText("❌ У вас нет арбалета! Скрафтите его", player.x, player.y, "#ff8888");
+                return false;
+            }
             if (arrows <= 0) {
                 showFloatingText("❌ Нет стрел!", player.x, player.y, "#ff8888");
                 return false;
@@ -242,7 +272,7 @@
                     drawGame();
                 } else if (copper >= 1) {
                     copper--;
-                    showFloatingText("🟤 Медь переплавлена", player.x, player.y, "#ccccaa");
+                    showFloatingText("🟤 Медь переплавлена, нужно 2 для железа", player.x, player.y, "#ccccaa");
                     coal--;
                     updateUI();
                     drawGame();
@@ -280,8 +310,10 @@
                     if (weapon.crafted) {
                         const slot = document.createElement('div');
                         slot.className = 'inv-slot';
-                        let isEquipped = (currentWeaponMode === 'melee' && weapon.id === 'melee_default') ||
-                                         (currentWeaponMode === weapon.id);
+                        let isEquipped = false;
+                        if (weapon.id === 'melee_default' && currentWeaponMode === 'melee') isEquipped = true;
+                        if (weapon.id === 'bow' && currentWeaponMode === 'bow') isEquipped = true;
+                        if (weapon.id === 'crossbow' && currentWeaponMode === 'crossbow') isEquipped = true;
                         if (isEquipped) slot.classList.add('equipped');
                         let icon = weapon.id === 'melee_default' ? '⛏️' : (weapon.id === 'copper_sword' ? '🗡️' : (weapon.id === 'iron_sword' ? '⚔️' : (weapon.id === 'bow' ? '🏹' : '🎯')));
                         slot.innerHTML = `<div class="inv-slot-icon">${icon}</div><div class="inv-slot-name">${weapon.name}</div><div class="inv-slot-damage">${weapon.damage} урона</div>`;
@@ -311,7 +343,10 @@
             if (eqTool) eqTool.innerHTML = getToolById(equippedToolId)?.name || "Деревянная";
             const eqWeapon = document.getElementById('equippedWeapon');
             if (eqWeapon) {
-                let weaponName = currentWeaponMode === 'melee' ? 'Кирка' : (currentWeaponMode === 'bow' ? 'Лук' : 'Арбалет');
+                let weaponName = "Кирка";
+                if (currentWeaponMode === 'bow' && hasWeapon('bow')) weaponName = "Лук";
+                else if (currentWeaponMode === 'crossbow' && hasWeapon('crossbow')) weaponName = "Арбалет";
+                else if (currentWeaponMode === 'melee') weaponName = "Кирка/меч";
                 eqWeapon.innerHTML = weaponName;
             }
             modal.style.display = 'flex';
@@ -322,94 +357,10 @@
             if (modal) modal.style.display = 'none';
         }
 
-        // Джойстик
-        let joystickContainer, joystickBase, joystickThumb;
-        let joystickActive = false;
-        let joystickCenter = { x: 0, y: 0 };
-        let joystickMaxDist = 50;
+        // Движение и джойстик (упрощённо, чтобы работало)
         let moveDirection = { x: 0, y: 0 };
         let lastMoveTime = 0;
         const MOVE_DELAY = 160;
-        let joystickTimeout = null;
-        let lastTapX = null, lastTapY = null, wasMoved = false;
-
-        function initJoystick() {
-            joystickContainer = document.createElement('div');
-            joystickContainer.style.cssText = `position:fixed;width:130px;height:130px;z-index:1500;display:none;touch-action:none;`;
-            joystickBase = document.createElement('div');
-            joystickBase.style.cssText = `width:100%;height:100%;background:rgba(30,30,40,0.75);backdrop-filter:blur(12px);border-radius:999px;border:2px solid #ffd966aa;display:flex;justify-content:center;align-items:center;`;
-            joystickThumb = document.createElement('div');
-            joystickThumb.style.cssText = `width:55px;height:55px;background:radial-gradient(circle at 30% 30%, #f5e2b0, #c99e4a);border-radius:999px;position:relative;`;
-            joystickBase.appendChild(joystickThumb);
-            joystickContainer.appendChild(joystickBase);
-            document.body.appendChild(joystickContainer);
-            canvas.addEventListener('touchstart', onTouchStart);
-            canvas.addEventListener('touchmove', onTouchMove);
-            canvas.addEventListener('touchend', onTouchEnd);
-            canvas.addEventListener('touchcancel', onTouchEnd);
-        }
-
-        function onTouchStart(e) {
-            e.preventDefault();
-            const touch = e.touches[0];
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            let canvasX = (touch.clientX - rect.left) * scaleX;
-            let canvasY = (touch.clientY - rect.top) * scaleY;
-            let tileX = Math.floor(canvasX / TILE_SIZE);
-            let tileY = Math.floor(canvasY / TILE_SIZE);
-            joystickTimeout = setTimeout(() => {
-                let x = touch.clientX - 65;
-                let y = touch.clientY - 65;
-                x = Math.min(window.innerWidth - 130, Math.max(0, x));
-                y = Math.min(window.innerHeight - 130, Math.max(20, y));
-                joystickContainer.style.left = x + 'px';
-                joystickContainer.style.top = y + 'px';
-                joystickContainer.style.display = 'block';
-                const rectJ = joystickContainer.getBoundingClientRect();
-                joystickCenter.x = rectJ.left + rectJ.width / 2;
-                joystickCenter.y = rectJ.top + rectJ.height / 2;
-                joystickActive = true;
-            }, 200);
-            lastTapX = tileX;
-            lastTapY = tileY;
-            wasMoved = false;
-        }
-
-        function onTouchMove(e) {
-            if (!joystickActive) {
-                if (joystickTimeout) clearTimeout(joystickTimeout);
-                joystickTimeout = null;
-                wasMoved = true;
-                return;
-            }
-            e.preventDefault();
-            const touch = e.touches[0];
-            let dx = touch.clientX - joystickCenter.x;
-            let dy = touch.clientY - joystickCenter.y;
-            let dist = Math.min(Math.hypot(dx, dy), joystickMaxDist);
-            let angle = Math.atan2(dy, dx);
-            let offsetX = Math.cos(angle) * dist;
-            let offsetY = Math.sin(angle) * dist;
-            joystickThumb.style.transform = `translate(calc(-50% + ${offsetX}px), calc(-50% + ${offsetY}px))`;
-            moveDirection.x = Math.cos(angle) * (dist / joystickMaxDist);
-            moveDirection.y = Math.sin(angle) * (dist / joystickMaxDist);
-            if (dist < 10) { moveDirection.x = 0; moveDirection.y = 0; }
-        }
-
-        function onTouchEnd(e) {
-            if (joystickTimeout) { clearTimeout(joystickTimeout); joystickTimeout = null; }
-            if (joystickActive) {
-                joystickActive = false;
-                joystickContainer.style.display = 'none';
-                joystickThumb.style.transform = 'translate(-50%, -50%)';
-                moveDirection.x = 0; moveDirection.y = 0;
-            } else if (!wasMoved && lastTapX !== null && lastTapX !== undefined && gameActive) {
-                onTapTile(lastTapX, lastTapY);
-            }
-            wasMoved = false; lastTapX = null; lastTapY = null;
-        }
 
         function tryMove(dx, dy) {
             if (!gameActive) return false;
@@ -422,9 +373,64 @@
             return false;
         }
 
+        // Упрощённая обработка касаний для телефона
+        let touchStartPos = null;
+        let touchTimeout = null;
+
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            let canvasX = (touch.clientX - rect.left) * scaleX;
+            let canvasY = (touch.clientY - rect.top) * scaleY;
+            let tileX = Math.floor(canvasX / TILE_SIZE);
+            let tileY = Math.floor(canvasY / TILE_SIZE);
+            
+            touchStartPos = { x: touch.clientX, y: touch.clientY, tileX, tileY };
+            
+            touchTimeout = setTimeout(() => {
+                // Долгое нажатие - включаем джойстик
+                moveDirection = { x: 0, y: 0 };
+                touchStartPos = null;
+            }, 200);
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            if (!touchStartPos) return;
+            e.preventDefault();
+            const touch = e.touches[0];
+            let dx = touch.clientX - touchStartPos.x;
+            let dy = touch.clientY - touchStartPos.y;
+            if (Math.abs(dx) > 20 || Math.abs(dy) > 20) {
+                // Это движение, а не тап
+                if (touchTimeout) clearTimeout(touchTimeout);
+                let angle = Math.atan2(dy, dx);
+                moveDirection.x = Math.cos(angle);
+                moveDirection.y = Math.sin(angle);
+                touchStartPos = null;
+            }
+        });
+
+        canvas.addEventListener('touchend', (e) => {
+            if (touchTimeout) {
+                clearTimeout(touchTimeout);
+                if (touchStartPos) {
+                    // Короткий тап - действие
+                    onTapTile(touchStartPos.tileX, touchStartPos.tileY);
+                }
+            }
+            moveDirection = { x: 0, y: 0 };
+            touchStartPos = null;
+        });
+
         function updateMovement() {
             if (!gameActive) return;
-            if (moveDirection.x === 0 && moveDirection.y === 0) return;
+            if (moveDirection.x === 0 && moveDirection.y === 0) {
+                requestAnimationFrame(updateMovement);
+                return;
+            }
             let now = Date.now();
             if (now - lastMoveTime >= MOVE_DELAY) {
                 let dx = Math.abs(moveDirection.x) > 0.3 ? (moveDirection.x > 0 ? 1 : -1) : 0;
@@ -435,7 +441,7 @@
             requestAnimationFrame(updateMovement);
         }
 
-        // Клавиатура
+        // Клавиатура для ПК
         let keys = {};
         window.addEventListener('keydown', (e) => {
             if (!gameActive) return;
@@ -462,7 +468,7 @@
             }
         }
 
-        // Игровой цикл
+        // Игровой цикл (зомби атакуют!)
         function gameLoop() {
             let now = Date.now();
             if (now - lastTick >= 1000 && gameActive) {
@@ -471,8 +477,10 @@
                 if (cycleSeconds >= 45) {
                     cycleSeconds = 0;
                     dayTime = 1 - dayTime;
-                    if (dayTime === 0) { survivedNights++; zombies = []; }
-                    else {
+                    if (dayTime === 0) { 
+                        survivedNights++; 
+                        zombies = []; 
+                    } else {
                         for (let i = 0; i < 3; i++) {
                             let x = Math.min(MAP_WIDTH - 1, Math.max(0, player.x + (Math.random() > 0.5 ? 3 : -3)));
                             let y = Math.min(MAP_HEIGHT - 1, Math.max(0, player.y + (Math.random() > 0.5 ? 2 : -2)));
@@ -487,6 +495,8 @@
                         bonusChest.active = true;
                         bonusChest.x = Math.floor(Math.random() * (MAP_WIDTH - 2)) + 1;
                         bonusChest.y = Math.floor(Math.random() * (MAP_HEIGHT - 2)) + 1;
+                        bonusChest.health = 6;
+                        bonusChest.maxHealth = 6;
                         bonusChest.spawnTimer = 60;
                         showFloatingText("✨ Бонусный сундук появился!", bonusChest.x, bonusChest.y, "#ffaa44");
                     }
@@ -496,7 +506,33 @@
                 if (player.hunger <= 0) {
                     player.health = Math.max(0, player.health - 1);
                     updateUI();
-                    if (player.health <= 0) { gameActive = false; alert("💀 Вы погибли! Обновите страницу."); }
+                    if (player.health <= 0) { gameActive = false; alert("💀 Вы погибли от голода! Обновите страницу."); }
+                }
+                
+                // ЗОМБИ АТАКУЮТ!
+                for (let i = 0; i < zombies.length; i++) {
+                    let z = zombies[i];
+                    let dx = Math.sign(player.x - z.x);
+                    let dy = Math.sign(player.y - z.y);
+                    
+                    if (Math.abs(player.x - z.x) <= 1 && Math.abs(player.y - z.y) <= 1) {
+                        // Атака зомби
+                        player.health = Math.max(0, player.health - 4);
+                        showFloatingText(`💔 Зомби атакует! -4`, player.x, player.y, "#ff5555");
+                        updateUI();
+                        if (player.health <= 0) {
+                            gameActive = false;
+                            alert("💀 Вас убили зомби! Обновите страницу.");
+                        }
+                    } else {
+                        // Движение к игроку
+                        let newX = z.x + dx;
+                        let newY = z.y + dy;
+                        if (newX >= 0 && newX < MAP_WIDTH && newY >= 0 && newY < MAP_HEIGHT) {
+                            z.x = newX;
+                            z.y = newY;
+                        }
+                    }
                 }
                 drawGame();
             }
@@ -504,6 +540,7 @@
             requestAnimationFrame(gameLoop);
         }
 
+        // Отрисовка (улучшенная, без вылезаний)
         function drawGame() {
             if (!ctx || !worldMap.length) return;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -514,69 +551,71 @@
                     let x = col * TILE_SIZE, y = row * TILE_SIZE;
                     if (b.type === 0) {
                         ctx.fillStyle = '#5f7e4a';
-                        ctx.fillRect(x, y, TILE_SIZE - 1, TILE_SIZE - 1);
-                    } else if (b.type === 1) {
-                        ctx.fillStyle = '#5c3e1f';
-                        ctx.fillRect(x, y, TILE_SIZE - 1, TILE_SIZE - 1);
-                        ctx.fillStyle = '#7c5e2b';
-                        ctx.fillRect(x + 8, y + 10, TILE_SIZE - 16, TILE_SIZE - 10);
-                    } else if (b.type === 2) {
-                        ctx.fillStyle = '#6b6b6b';
-                        ctx.fillRect(x, y, TILE_SIZE - 1, TILE_SIZE - 1);
-                    } else if (b.type === 3) {
-                        ctx.fillStyle = '#b3470c';
-                        ctx.fillRect(x, y, TILE_SIZE - 1, TILE_SIZE - 1);
-                        ctx.fillStyle = '#ffbb77';
-                        ctx.fillText('🍓', x + 18, y + 30);
-                    } else if (b.type === 4) {
-                        ctx.fillStyle = '#8b5a2b';
-                        ctx.fillRect(x, y, TILE_SIZE - 1, TILE_SIZE - 1);
-                        ctx.fillStyle = '#f7d44a';
-                        ctx.fillText('✨', x + 22, y + 30);
-                    } else if (b.type === 5) {
-                        ctx.fillStyle = '#3a3a3a';
-                        ctx.fillRect(x, y, TILE_SIZE - 1, TILE_SIZE - 1);
-                    } else if (b.type === 6) {
-                        ctx.fillStyle = '#b87333';
-                        ctx.fillRect(x, y, TILE_SIZE - 1, TILE_SIZE - 1);
-                    } else if (b.type === 7) {
-                        ctx.fillStyle = '#8c8c8c';
-                        ctx.fillRect(x, y, TILE_SIZE - 1, TILE_SIZE - 1);
+                        ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                        ctx.fillStyle = '#6f9e55';
+                        ctx.fillRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+                    } else {
+                        ctx.fillStyle = '#8B5A2B';
+                        ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                        ctx.fillStyle = '#A0662D';
+                        ctx.fillRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+                        ctx.fillStyle = '#F5DEB3';
+                        ctx.font = `${TILE_SIZE * 0.5}px monospace`;
+                        ctx.fillText(blockStats[b.type]?.icon || '?', x + TILE_SIZE * 0.25, y + TILE_SIZE * 0.7);
                     }
                 }
             }
+            
+            // Бонусный сундук
             if (bonusChest.active && worldMap[bonusChest.y]?.[bonusChest.x]?.type === 0) {
                 let x = bonusChest.x * TILE_SIZE, y = bonusChest.y * TILE_SIZE;
-                ctx.fillStyle = '#d4af37';
-                ctx.fillRect(x + 8, y + 10, 34, 26);
-                ctx.fillStyle = '#ffd966';
-                ctx.fillText('🎁', x + 22, y + 32);
+                ctx.fillStyle = '#DAA520';
+                ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                ctx.fillStyle = '#FFD700';
+                ctx.font = `${TILE_SIZE * 0.5}px monospace`;
+                ctx.fillText('🎁', x + TILE_SIZE * 0.25, y + TILE_SIZE * 0.7);
+                // Полоска здоровья сундука
+                ctx.fillStyle = '#aa0000';
+                ctx.fillRect(x + 5, y + 2, (bonusChest.health / bonusChest.maxHealth) * (TILE_SIZE - 10), 4);
             }
+            
+            // Стив (аккуратно, без вылезаний)
             let px = player.x * TILE_SIZE, py = player.y * TILE_SIZE;
-            ctx.fillStyle = "#4c7a4a";
-            ctx.fillRect(px + 12, py + 20, 26, 18);
-            ctx.fillStyle = "#e0aa7a";
-            ctx.fillRect(px + 14, py + 6, 22, 18);
-            ctx.fillStyle = "#2e241f";
-            ctx.fillRect(px + 20, py + 10, 4, 4);
-            ctx.fillRect(px + 26, py + 10, 4, 4);
+            ctx.fillStyle = "#4C7A4A";
+            ctx.fillRect(px + 8, py + 16, TILE_SIZE - 16, TILE_SIZE - 24);
+            ctx.fillStyle = "#3B2F2A";
+            ctx.fillRect(px + 8, py + TILE_SIZE - 16, TILE_SIZE - 16, 8);
+            ctx.fillStyle = "#E0AA7A";
+            ctx.fillRect(px + 12, py + 6, TILE_SIZE - 24, TILE_SIZE - 28);
+            ctx.fillStyle = "#2E241F";
+            ctx.fillRect(px + 18, py + 12, 4, 4);
+            ctx.fillRect(px + TILE_SIZE - 22, py + 12, 4, 4);
+            ctx.fillStyle = "#1F1408";
+            ctx.fillRect(px + 12, py + 4, TILE_SIZE - 24, 5);
+            
+            // Зомби
             zombies.forEach(z => {
                 let zx = z.x * TILE_SIZE, zy = z.y * TILE_SIZE;
-                ctx.fillStyle = "#2f6b3a";
-                ctx.fillRect(zx + 10, zy + 14, 30, 30);
+                ctx.fillStyle = "#2F6B3A";
+                ctx.fillRect(zx + 6, zy + 10, TILE_SIZE - 12, TILE_SIZE - 16);
+                ctx.fillStyle = "#1F3A1A";
+                ctx.fillRect(zx + 14, zy + 6, TILE_SIZE - 28, 10);
                 ctx.fillStyle = "#000";
-                ctx.fillRect(zx + 20, zy + 22, 4, 4);
-                ctx.fillRect(zx + 26, zy + 22, 4, 4);
-                ctx.fillStyle = "#aa0000";
-                ctx.fillRect(zx + 5, zy + 2, (z.health / 20) * 40, 5);
+                ctx.fillRect(zx + 16, zy + 18, 4, 4);
+                ctx.fillRect(zx + TILE_SIZE - 20, zy + 18, 4, 4);
+                ctx.fillStyle = "#AA0000";
+                ctx.fillRect(zx + 5, zy + 3, (z.health / 20) * (TILE_SIZE - 10), 4);
             });
+            
+            // Тексты
             floatingMessages = floatingMessages.filter(m => { m.life -= 0.03; m.y -= 1; return m.life > 0; });
             floatingMessages.forEach(m => {
                 ctx.font = "bold 14px monospace";
                 ctx.fillStyle = m.color;
                 ctx.fillText(m.text, m.x - 20, m.y - 12);
             });
-            if (dayTime === 1) { ctx.fillStyle = "rgba(0,0,40,0.6)"; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+            
+            if (dayTime === 1) { ctx.fillStyle = "rgba(0,0,40,0.5)"; ctx.fillRect(0, 0, canvas.width, canvas.height); }
         }
 
         function resizeCanvas() {
@@ -636,23 +675,19 @@
             });
         }
 
-        // Кнопки (все с проверкой)
+        // Подключаем кнопки
         const actionBtn = document.getElementById('actionBtn');
         if (actionBtn) actionBtn.onclick = () => harvestBlock();
-        
         const furnaceBtn = document.getElementById('furnaceBtn');
         if (furnaceBtn) furnaceBtn.onclick = () => smelt();
-        
         const inventoryBtn = document.getElementById('inventoryBtn');
         if (inventoryBtn) inventoryBtn.onclick = () => openInventory();
-        
         const inventoryToggle = document.getElementById('inventoryToggleBtn');
         if (inventoryToggle) inventoryToggle.onclick = () => openInventory();
-        
         const closeInv = document.getElementById('closeInventoryBtn');
         if (closeInv) closeInv.onclick = () => closeInventory();
 
-        // Создаём кнопку смены оружия, если её нет
+        // Кнопка смены оружия
         let nextWeaponBtn = document.getElementById('nextWeaponBtn');
         if (!nextWeaponBtn) {
             const weaponBtn = document.createElement('button');
@@ -667,20 +702,26 @@
             nextWeaponBtn.onclick = () => {
                 const weapons = ['melee', 'bow', 'crossbow'];
                 let idx = weapons.indexOf(currentWeaponMode);
-                idx = (idx + 1) % weapons.length;
+                let attempts = 0;
+                do {
+                    idx = (idx + 1) % weapons.length;
+                    attempts++;
+                    if (attempts > 3) break;
+                } while (weapons[idx] !== 'melee' && !hasWeapon(weapons[idx]));
                 currentWeaponMode = weapons[idx];
+                if (currentWeaponMode === 'melee') weaponDamage = 3;
+                else if (currentWeaponMode === 'bow') weaponDamage = 8;
+                else if (currentWeaponMode === 'crossbow') weaponDamage = 12;
                 let name = currentWeaponMode === 'melee' ? 'Кирка/меч' : (currentWeaponMode === 'bow' ? 'Лук' : 'Арбалет');
                 showFloatingText(`⚔️ ${name}`, player.x, player.y, "#aaffaa");
                 updateUI();
             };
         }
 
-        // ЗАПУСК ИГРЫ
         generateWorld();
         renderCrafting();
         updateUI();
         resizeCanvas();
-        initJoystick();
         updateMovement();
         gameLoop();
         window.addEventListener('resize', resizeCanvas);
