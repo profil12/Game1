@@ -11,14 +11,14 @@
 
         function resizeCanvas() {
             const container = canvas.parentElement;
-            const maxWidth = container.clientWidth - 20;
+            const maxWidth = container.clientWidth - 10;
             TILE_SIZE = Math.floor(maxWidth / MAP_WIDTH);
             if (TILE_SIZE < 30) TILE_SIZE = 30;
             canvas.width = MAP_WIDTH * TILE_SIZE;
             canvas.height = MAP_HEIGHT * TILE_SIZE;
             canvas.style.width = '100%';
             canvas.style.height = 'auto';
-            if (worldMap.length) drawGame();
+            if (window.worldMap && window.worldMap.length) drawGame();
         }
         window.addEventListener('resize', resizeCanvas);
         window.addEventListener('orientationchange', resizeCanvas);
@@ -30,6 +30,13 @@
         let survivedNights = 0;
         let gameActive = true;
         let deathReason = "";
+        let worldMap = [];
+        let zombies = [];
+        let dayTime = 0;
+        let cycleSeconds = 0;
+        let lastTick = Date.now();
+        let floatingMessages = [];
+        let bonusChest = { active: false, x: 0, y: 0, spawnTimer: 60, health: 6, maxHealth: 6 };
 
         // ========== ОРУЖИЕ ==========
         let currentWeaponMode = "melee";
@@ -55,15 +62,7 @@
         function getToolById(id) { return availableTools.find(t => t.id === id); }
         function hasWeapon(weaponId) { return availableWeapons.find(w => w.id === weaponId)?.crafted === true; }
 
-        // ========== МИР ==========
-        let worldMap = [];
-        let zombies = [];
-        let dayTime = 0;
-        let cycleSeconds = 0;
-        let lastTick = Date.now();
-        let floatingMessages = [];
-        let bonusChest = { active: false, x: 0, y: 0, spawnTimer: 60, health: 6, maxHealth: 6 };
-
+        // ========== СТАТЫ БЛОКОВ ==========
         const blockStats = {
             1: { name: "дерево", baseHealth: 8, drops: { wood: 3 }, toolRequired: 1, icon: "🌲", color: "#5C3E1F", lightColor: "#7C5E2B", respawnDelay: 8000 },
             2: { name: "камень", baseHealth: 12, drops: { stone: 2 }, toolRequired: 2, icon: "🪨", color: "#6B6B6B", lightColor: "#8F8F8F", respawnDelay: 10000 },
@@ -152,25 +151,13 @@
         function showDeathScreen() {
             gameActive = false;
             const overlay = document.createElement('div');
-            overlay.style.cssText = `
-                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-                background: rgba(0,0,0,0.9); backdrop-filter: blur(8px);
-                display: flex; justify-content: center; align-items: center;
-                z-index: 10000;
-            `;
-            overlay.innerHTML = `
-                <div style="background: #2A1A0A; border: 3px solid #FF6644; border-radius: 48px; padding: 30px; text-align: center; color: #FFCC88;">
-                    <div style="font-size: 2rem;">💀 ВЫ ПОГИБЛИ 💀</div>
-                    <div style="margin-top: 15px;">${deathReason}</div>
-                    <div style="margin-top: 10px;">Выжито дней: ${survivedNights}</div>
-                    <button id="restartBtn" style="margin-top: 20px; background: #FF8844; border: none; padding: 10px 30px; border-radius: 40px; font-size: 1.2rem; cursor: pointer;">Играть снова</button>
-                </div>
-            `;
+            overlay.style.cssText = `position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); backdrop-filter:blur(8px); display:flex; justify-content:center; align-items:center; z-index:10000;`;
+            overlay.innerHTML = `<div style="background:#2A1A0A; border:3px solid #FF6644; border-radius:48px; padding:30px; text-align:center; color:#FFCC88;"><div style="font-size:2rem;">💀 ВЫ ПОГИБЛИ 💀</div><div style="margin-top:15px;">${deathReason}</div><div style="margin-top:10px;">Выжито дней: ${survivedNights}</div><button id="restartBtn" style="margin-top:20px; background:#FF8844; border:none; padding:10px 30px; border-radius:40px; font-size:1.2rem; cursor:pointer;">Играть снова</button></div>`;
             document.body.appendChild(overlay);
             document.getElementById('restartBtn').onclick = () => location.reload();
         }
 
-        // ========== БЛИЖНИЙ БОЙ И ДОБЫЧА ==========
+        // ========== БЛИЖНИЙ БОЙ ==========
         function meleeAttack() {
             for (let i = 0; i < zombies.length; i++) {
                 let z = zombies[i];
@@ -190,7 +177,6 @@
 
         function harvestBlock() {
             let bx = player.x, by = player.y;
-            
             if (bonusChest.active && bx === bonusChest.x && by === bonusChest.y) {
                 bonusChest.health -= (getToolById(equippedToolId)?.damage || 2);
                 showFloatingText(`💥 Сундук: ${bonusChest.health}/${bonusChest.maxHealth}`, bx, by, "#ffaa66");
@@ -206,7 +192,6 @@
                 drawGame();
                 return;
             }
-            
             let block = worldMap[by]?.[bx];
             if (!block || block.type === 0) {
                 showFloatingText("🌿 Пусто", bx, by, "#aaa");
@@ -235,11 +220,8 @@
                         else { coal += 5; showFloatingText("🔥 +5 угля", bx, by, "#aaffaa"); }
                     }
                 }
-                if (stats.respawnDelay) {
-                    scheduleRespawn(bx, by, block.type);
-                } else {
-                    worldMap[by][bx] = { type: 0, health: 0, maxHealth: 0, respawnTimer: null };
-                }
+                if (stats.respawnDelay) scheduleRespawn(bx, by, block.type);
+                else worldMap[by][bx] = { type: 0, health: 0, maxHealth: 0, respawnTimer: null };
                 updateUI();
                 showFloatingText("✓ Сломано", bx, by, "#aaffaa");
             } else {
@@ -248,7 +230,7 @@
             drawGame();
         }
 
-        // ========== ДАЛЬНИЙ БОЙ ==========
+        // ========== ДАЛЬНИЙ БОЙ (ЛУК/АРБАЛЕТ) ==========
         function rangedAttack(tileX, tileY) {
             if (currentWeaponMode === "melee") {
                 showFloatingText("❌ Смени оружие на лук/арбалет", player.x, player.y, "#ff8888");
@@ -288,17 +270,13 @@
 
         function performAction() {
             if (!gameActive) return;
-            if (!meleeAttack()) {
-                harvestBlock();
-            }
+            if (!meleeAttack()) harvestBlock();
         }
 
         function smelt() {
             if (!gameActive) return;
             if (coal > 0 && copper >= 2) {
-                copper -= 2;
-                iron += 1;
-                coal--;
+                copper -= 2; iron += 1; coal--;
                 showFloatingText("⚙️ Железо выплавлено!", player.x, player.y, "#aaffaa");
                 updateUI();
             } else if (coal > 0 && copper >= 1) {
@@ -317,15 +295,15 @@
             if (!gameActive) return;
             const modal = document.getElementById('inventoryModal');
             if (!modal) return;
-            const slotsContainer = document.getElementById('inventorySlots');
-            if (slotsContainer) {
-                slotsContainer.innerHTML = '';
+            const slots = document.getElementById('inventorySlots');
+            if (slots) {
+                slots.innerHTML = '';
                 availableTools.forEach(tool => {
                     if (tool.crafted) {
                         const slot = document.createElement('div');
                         slot.className = 'inv-slot';
                         if (equippedToolId === tool.id) slot.classList.add('equipped');
-                        slot.innerHTML = `<div class="inv-slot-icon">${tool.icon}</div><div class="inv-slot-name">${tool.name}</div><div class="inv-slot-damage">${tool.damage} урона</div>`;
+                        slot.innerHTML = `<div class="inv-slot-icon">${tool.icon}</div><div class="inv-slot-name">${tool.name}</div><div class="inv-slot-damage">${tool.damage}</div>`;
                         slot.onclick = () => {
                             equippedToolId = tool.id;
                             toolTier = tool.tier;
@@ -333,60 +311,42 @@
                             updateUI();
                             openInventory();
                         };
-                        slotsContainer.appendChild(slot);
+                        slots.appendChild(slot);
                     }
                 });
                 availableWeapons.forEach(weapon => {
                     if (weapon.crafted) {
                         const slot = document.createElement('div');
                         slot.className = 'inv-slot';
-                        let isEquipped = (weapon.id === 'melee_default' && currentWeaponMode === 'melee') ||
-                                         (weapon.id === 'bow' && currentWeaponMode === 'bow') ||
-                                         (weapon.id === 'crossbow' && currentWeaponMode === 'crossbow');
-                        if (isEquipped) slot.classList.add('equipped');
-                        slot.innerHTML = `<div class="inv-slot-icon">${weapon.icon}</div><div class="inv-slot-name">${weapon.name}</div><div class="inv-slot-damage">${weapon.damage} урона</div>`;
+                        let eq = (weapon.id === 'melee_default' && currentWeaponMode === 'melee') ||
+                                 (weapon.id === 'bow' && currentWeaponMode === 'bow') ||
+                                 (weapon.id === 'crossbow' && currentWeaponMode === 'crossbow');
+                        if (eq) slot.classList.add('equipped');
+                        slot.innerHTML = `<div class="inv-slot-icon">${weapon.icon}</div><div class="inv-slot-name">${weapon.name}</div><div class="inv-slot-damage">${weapon.damage}</div>`;
                         slot.onclick = () => {
-                            if (weapon.id === 'melee_default') {
-                                currentWeaponMode = 'melee';
-                                weaponDamage = weapon.damage;
-                            } else if (weapon.id === 'bow') {
-                                currentWeaponMode = 'bow';
-                                weaponDamage = weapon.damage;
-                            } else if (weapon.id === 'crossbow') {
-                                currentWeaponMode = 'crossbow';
-                                weaponDamage = weapon.damage;
-                            } else {
-                                currentWeaponMode = 'melee';
-                                weaponDamage = weapon.damage;
-                            }
+                            if (weapon.id === 'melee_default') { currentWeaponMode = 'melee'; weaponDamage = weapon.damage; }
+                            else if (weapon.id === 'bow') { currentWeaponMode = 'bow'; weaponDamage = weapon.damage; }
+                            else if (weapon.id === 'crossbow') { currentWeaponMode = 'crossbow'; weaponDamage = weapon.damage; }
+                            else { currentWeaponMode = 'melee'; weaponDamage = weapon.damage; }
                             showFloatingText(`🗡️ ${weapon.name}`, player.x, player.y, "#aaffaa");
                             updateUI();
                             openInventory();
                         };
-                        slotsContainer.appendChild(slot);
+                        slots.appendChild(slot);
                     }
                 });
             }
-            const eqTool = document.getElementById('equippedTool');
-            if (eqTool) eqTool.innerHTML = getToolById(equippedToolId)?.name || "Деревянная";
-            const eqWeapon = document.getElementById('equippedWeapon');
-            if (eqWeapon) {
-                let weaponName = currentWeaponMode === 'melee' ? 'Кирка/меч' : (currentWeaponMode === 'bow' ? 'Лук' : 'Арбалет');
-                eqWeapon.innerHTML = weaponName;
-            }
+            document.getElementById('equippedTool').innerHTML = getToolById(equippedToolId)?.name || "Деревянная";
+            let wName = currentWeaponMode === 'melee' ? 'Кирка/меч' : (currentWeaponMode === 'bow' ? 'Лук' : 'Арбалет');
+            document.getElementById('equippedWeapon').innerHTML = wName;
             modal.style.display = 'flex';
         }
-
-        function closeInventory() {
-            const modal = document.getElementById('inventoryModal');
-            if (modal) modal.style.display = 'none';
-        }
+        function closeInventory() { const m = document.getElementById('inventoryModal'); if (m) m.style.display = 'none'; }
 
         // ========== ДВИЖЕНИЕ ==========
         let moveDirection = { x: 0, y: 0 };
         let lastMoveTime = 0;
         const MOVE_DELAY = 160;
-
         function tryMove(dx, dy) {
             if (!gameActive) return false;
             let nx = player.x + dx, ny = player.y + dy;
@@ -398,10 +358,8 @@
             return false;
         }
 
-        // ========== ТЕЛЕФОН: ДЖОЙСТИК ==========
-        let touchStartPos = null;
-        let touchTimeout = null;
-
+        // ========== ТЕЛЕФОН: ДЖОЙСТИК И СТРЕЛЬБА ==========
+        let touchStartPos = null, touchTimeout = null;
         canvas.addEventListener('touchstart', (e) => {
             if (!gameActive) return;
             e.preventDefault();
@@ -413,14 +371,12 @@
             let canvasY = (touch.clientY - rect.top) * scaleY;
             let tileX = Math.floor(canvasX / TILE_SIZE);
             let tileY = Math.floor(canvasY / TILE_SIZE);
-            
             touchStartPos = { x: touch.clientX, y: touch.clientY, tileX, tileY };
             touchTimeout = setTimeout(() => {
                 moveDirection = { x: 0.5, y: 0.5 };
                 touchStartPos = null;
             }, 200);
         });
-
         canvas.addEventListener('touchmove', (e) => {
             if (!touchStartPos) return;
             e.preventDefault();
@@ -435,26 +391,20 @@
                 touchStartPos = null;
             }
         });
-
         canvas.addEventListener('touchend', () => {
             if (touchTimeout) {
                 clearTimeout(touchTimeout);
                 if (touchStartPos && gameActive) {
-                    let hitZombie = false;
+                    let hit = false;
                     for (let z of zombies) {
                         if (z.x === touchStartPos.tileX && z.y === touchStartPos.tileY) {
-                            if (currentWeaponMode !== "melee") {
-                                rangedAttack(touchStartPos.tileX, touchStartPos.tileY);
-                            } else {
-                                performAction();
-                            }
-                            hitZombie = true;
+                            if (currentWeaponMode !== "melee") rangedAttack(touchStartPos.tileX, touchStartPos.tileY);
+                            else performAction();
+                            hit = true;
                             break;
                         }
                     }
-                    if (!hitZombie) {
-                        performAction();
-                    }
+                    if (!hit) performAction();
                 }
             }
             moveDirection = { x: 0, y: 0 };
@@ -489,7 +439,6 @@
             if (k === 'i') { e.preventDefault(); openInventory(); }
         });
         window.addEventListener('keyup', (e) => { let k = e.key.toLowerCase(); delete keys[k]; updateKeyboardMovement(); });
-
         function updateKeyboardMovement() {
             let dx = 0, dy = 0;
             if (keys['arrowup'] || keys['w']) dy = -1;
@@ -505,19 +454,15 @@
         // ========== ИГРОВОЙ ЦИКЛ ==========
         setInterval(() => {
             if (!gameActive) return;
-            
-            const now = Date.now();
+            let now = Date.now();
             if (now - lastTick >= 1000) {
                 lastTick = now;
                 cycleSeconds++;
-                
                 if (cycleSeconds >= 45) {
                     cycleSeconds = 0;
                     dayTime = 1 - dayTime;
-                    if (dayTime === 0) { 
-                        survivedNights++; 
-                        zombies = []; 
-                    } else {
+                    if (dayTime === 0) { survivedNights++; zombies = []; }
+                    else {
                         for (let i = 0; i < 3; i++) {
                             let x = Math.min(MAP_WIDTH - 1, Math.max(0, player.x + (Math.random() > 0.5 ? 3 : -3)));
                             let y = Math.min(MAP_HEIGHT - 1, Math.max(0, player.y + (Math.random() > 0.5 ? 2 : -2)));
@@ -526,48 +471,30 @@
                     }
                     updateUI();
                 }
-                
                 if (!bonusChest.active) {
                     bonusChest.spawnTimer--;
                     if (bonusChest.spawnTimer <= 0) {
-                        let freeCells = [];
-                        for (let i = 0; i < MAP_HEIGHT; i++) {
-                            for (let j = 0; j < MAP_WIDTH; j++) {
-                                if (worldMap[i][j].type === 0 && !(player.x === j && player.y === i)) {
-                                    freeCells.push({ x: j, y: i });
-                                }
-                            }
-                        }
-                        if (freeCells.length > 0) {
-                            let pos = freeCells[Math.floor(Math.random() * freeCells.length)];
+                        let free = [];
+                        for (let i = 0; i < MAP_HEIGHT; i++)
+                            for (let j = 0; j < MAP_WIDTH; j++)
+                                if (worldMap[i][j].type === 0 && !(player.x === j && player.y === i)) free.push({ x: j, y: i });
+                        if (free.length) {
+                            let pos = free[Math.floor(Math.random() * free.length)];
                             bonusChest.active = true;
-                            bonusChest.x = pos.x;
-                            bonusChest.y = pos.y;
-                            bonusChest.health = 6;
-                            bonusChest.maxHealth = 6;
+                            bonusChest.x = pos.x; bonusChest.y = pos.y;
+                            bonusChest.health = 6; bonusChest.maxHealth = 6;
                             bonusChest.spawnTimer = 60;
                             showFloatingText("✨ Бонусный сундук появился!", bonusChest.x, bonusChest.y, "#ffaa44");
-                        } else {
-                            bonusChest.spawnTimer = 10;
-                        }
+                        } else bonusChest.spawnTimer = 10;
                         updateUI();
                     }
                 }
-                
-                if (dayTime === 0 && player.hunger > 0 && Math.random() < 0.3) { 
-                    player.hunger--; 
-                    updateUI(); 
-                }
+                if (dayTime === 0 && player.hunger > 0 && Math.random() < 0.3) { player.hunger--; updateUI(); }
                 if (player.hunger <= 0) {
                     player.health = Math.max(0, player.health - 1);
                     updateUI();
-                    if (player.health <= 0) {
-                        deathReason = "💀 Вы умерли от голода!";
-                        showDeathScreen();
-                        return;
-                    }
+                    if (player.health <= 0) { deathReason = "💀 Вы умерли от голода!"; showDeathScreen(); return; }
                 }
-                
                 for (let i = 0; i < zombies.length; i++) {
                     let z = zombies[i];
                     let dx = Math.sign(player.x - z.x);
@@ -576,17 +503,11 @@
                         player.health = Math.max(0, player.health - 4);
                         showFloatingText(`💔 Зомби атакует! -4`, player.x, player.y, "#ff5555");
                         updateUI();
-                        if (player.health <= 0) {
-                            deathReason = "🧟 Вас убили зомби!";
-                            showDeathScreen();
-                            return;
-                        }
+                        if (player.health <= 0) { deathReason = "🧟 Вас убили зомби!"; showDeathScreen(); return; }
                     } else {
-                        let newX = z.x + dx;
-                        let newY = z.y + dy;
-                        if (newX >= 0 && newX < MAP_WIDTH && newY >= 0 && newY < MAP_HEIGHT && worldMap[newY][newX].type === 0) {
-                            z.x = newX;
-                            z.y = newY;
+                        let nx = z.x + dx, ny = z.y + dy;
+                        if (nx >= 0 && nx < MAP_WIDTH && ny >= 0 && ny < MAP_HEIGHT && worldMap[ny][nx].type === 0) {
+                            z.x = nx; z.y = ny;
                         }
                     }
                 }
@@ -594,7 +515,7 @@
             }
         }, 100);
 
-        // ========== ОТРИСОВКА ==========
+        // ========== ОТРИСОВКА (НОРМАЛЬНЫЙ СТИВ) ==========
         function drawGame() {
             if (!ctx || !worldMap.length) return;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -609,14 +530,14 @@
                         ctx.fillStyle = '#6F9E55';
                         ctx.fillRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
                     } else {
-                        let stats = blockStats[b.type];
-                        ctx.fillStyle = stats.color;
+                        let s = blockStats[b.type];
+                        ctx.fillStyle = s.color;
                         ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-                        ctx.fillStyle = stats.lightColor;
+                        ctx.fillStyle = s.lightColor;
                         ctx.fillRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
                         ctx.fillStyle = 'white';
                         ctx.font = `${TILE_SIZE * 0.5}px monospace`;
-                        ctx.fillText(stats.icon, x + TILE_SIZE * 0.25, y + TILE_SIZE * 0.7);
+                        ctx.fillText(s.icon, x + TILE_SIZE * 0.25, y + TILE_SIZE * 0.7);
                         if (b.health < b.maxHealth) {
                             ctx.fillStyle = '#FFAA44';
                             ctx.fillRect(x + 5, y + 2, (b.health / b.maxHealth) * (TILE_SIZE - 10), 4);
@@ -633,19 +554,29 @@
                 ctx.fillStyle = '#FFAA44';
                 ctx.fillRect(x + 5, y + 2, (bonusChest.health / bonusChest.maxHealth) * (TILE_SIZE - 10), 4);
             }
+            // Стив (нормальный)
             let px = player.x * TILE_SIZE, py = player.y * TILE_SIZE;
             let tool = getToolById(equippedToolId);
+            // Тело
             ctx.fillStyle = "#4C7A4A";
             ctx.fillRect(px + 6, py + 12, TILE_SIZE - 12, TILE_SIZE - 18);
+            // Пояс
             ctx.fillStyle = "#3B2F2A";
-            ctx.fillRect(px + 6, py + TILE_SIZE - 12, TILE_SIZE - 12, 6);
+            ctx.fillRect(px + 6, py + TILE_SIZE - 14, TILE_SIZE - 12, 6);
+            // Голова
             ctx.fillStyle = "#E0AA7A";
             ctx.fillRect(px + 10, py + 4, TILE_SIZE - 20, TILE_SIZE - 24);
+            // Глаза
             ctx.fillStyle = "#2E241F";
             ctx.fillRect(px + 16, py + 10, 4, 4);
             ctx.fillRect(px + TILE_SIZE - 20, py + 10, 4, 4);
+            // Волосы
+            ctx.fillStyle = "#1F1408";
+            ctx.fillRect(px + 10, py + 2, TILE_SIZE - 20, 5);
+            // Кирка в руке
             ctx.fillStyle = tool?.color || "#B57A3B";
             ctx.fillRect(px + TILE_SIZE - 14, py + TILE_SIZE - 20, 8, 16);
+            // Зомби
             zombies.forEach(z => {
                 let zx = z.x * TILE_SIZE, zy = z.y * TILE_SIZE;
                 ctx.fillStyle = "#2F6B3A";
@@ -664,9 +595,9 @@
                 ctx.fillStyle = m.color;
                 ctx.fillText(m.text, m.x - 20, m.y - 12);
             });
-            if (dayTime === 1) { 
-                ctx.fillStyle = "rgba(0,0,40,0.5)"; 
-                ctx.fillRect(0, 0, canvas.width, canvas.height); 
+            if (dayTime === 1) {
+                ctx.fillStyle = "rgba(0,0,40,0.5)";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
             }
         }
 
@@ -688,10 +619,7 @@
                         if (mat === 'copper' && copper < amt) ok = false;
                         if (mat === 'food' && food < amt) ok = false;
                     }
-                    if (!ok) { 
-                        showFloatingText("❌ Не хватает ресурсов!", player.x, player.y, "#ff8888");
-                        return; 
-                    }
+                    if (!ok) { showFloatingText("❌ Не хватает ресурсов!", player.x, player.y, "#ff8888"); return; }
                     for (let [mat, amt] of Object.entries(rec.need)) {
                         if (mat === 'stone') stone -= amt;
                         if (mat === 'wood') wood -= amt;
@@ -722,49 +650,37 @@
         }
 
         // ========== КНОПКИ ==========
-        const actionBtn = document.getElementById('actionBtn');
-        if (actionBtn) actionBtn.onclick = () => performAction();
-        const furnaceBtn = document.getElementById('furnaceBtn');
-        if (furnaceBtn) furnaceBtn.onclick = () => smelt();
-        const inventoryBtn = document.getElementById('inventoryBtn');
-        if (inventoryBtn) inventoryBtn.onclick = () => openInventory();
-        const inventoryToggle = document.getElementById('inventoryToggleBtn');
-        if (inventoryToggle) inventoryToggle.onclick = () => openInventory();
-        const closeInv = document.getElementById('closeInventoryBtn');
-        if (closeInv) closeInv.onclick = () => closeInventory();
-
-        let nextWeaponBtn = document.getElementById('nextWeaponBtn');
-        if (!nextWeaponBtn) {
-            const weaponBtn = document.createElement('button');
-            weaponBtn.id = 'nextWeaponBtn';
-            weaponBtn.className = 'action-btn';
-            weaponBtn.innerHTML = '🗡️ Сменить оружие';
-            const actionsDiv = document.querySelector('.action-buttons');
-            if (actionsDiv) actionsDiv.appendChild(weaponBtn);
-            nextWeaponBtn = document.getElementById('nextWeaponBtn');
+        document.getElementById('actionBtn')?.addEventListener('click', () => performAction());
+        document.getElementById('furnaceBtn')?.addEventListener('click', () => smelt());
+        document.getElementById('inventoryBtn')?.addEventListener('click', () => openInventory());
+        document.getElementById('inventoryToggleBtn')?.addEventListener('click', () => openInventory());
+        document.getElementById('closeInventoryBtn')?.addEventListener('click', () => closeInventory());
+        let nextBtn = document.getElementById('nextWeaponBtn');
+        if (!nextBtn) {
+            let btn = document.createElement('button');
+            btn.id = 'nextWeaponBtn';
+            btn.className = 'action-btn';
+            btn.innerHTML = '🗡️ Сменить оружие';
+            document.querySelector('.action-buttons')?.appendChild(btn);
+            nextBtn = document.getElementById('nextWeaponBtn');
         }
-        if (nextWeaponBtn) {
-            nextWeaponBtn.onclick = () => {
+        if (nextBtn) {
+            nextBtn.onclick = () => {
                 if (!gameActive) return;
                 const weapons = ['melee', 'bow', 'crossbow'];
                 let idx = weapons.indexOf(currentWeaponMode);
                 let attempts = 0;
-                do {
-                    idx = (idx + 1) % weapons.length;
-                    attempts++;
-                    if (attempts > 3) break;
-                } while (weapons[idx] !== 'melee' && !hasWeapon(weapons[idx]));
+                do { idx = (idx + 1) % weapons.length; attempts++; } while (weapons[idx] !== 'melee' && !hasWeapon(weapons[idx]) && attempts < 3);
                 currentWeaponMode = weapons[idx];
                 if (currentWeaponMode === 'melee') weaponDamage = 3;
                 else if (currentWeaponMode === 'bow') weaponDamage = 8;
                 else if (currentWeaponMode === 'crossbow') weaponDamage = 12;
-                let name = currentWeaponMode === 'melee' ? 'Кирка/меч' : (currentWeaponMode === 'bow' ? 'Лук' : 'Арбалет');
-                showFloatingText(`⚔️ ${name}`, player.x, player.y, "#aaffaa");
+                showFloatingText(`⚔️ ${currentWeaponMode === 'melee' ? 'Кирка/меч' : (currentWeaponMode === 'bow' ? 'Лук' : 'Арбалет')}`, player.x, player.y, "#aaffaa");
                 updateUI();
             };
         }
 
-        // ========== ЗАПУСК ==========
+        window.worldMap = worldMap;
         generateWorld();
         renderCrafting();
         updateUI();
