@@ -3,32 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-    <title>Minecraft Ферма | Полный экран + андроид</title>
+    <title>Minecraft Ферма | Полный экран</title>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-
         body {
             background: #0a0f1a;
             font-family: 'Courier New', monospace;
+            overflow-y: auto;
             display: flex;
             flex-direction: column;
             align-items: center;
             min-height: 100vh;
-            padding: 20px;
+            padding: 10px;
         }
-
-        /* Контейнер игры */
         .game-container {
-            max-width: 1000px;
+            max-width: 100%;
             width: 100%;
-            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
-
-        /* Canvas — на весь экран по ширине */
         canvas {
             display: block;
             margin: 0 auto;
@@ -40,86 +38,78 @@
             cursor: crosshair;
             touch-action: none;
         }
-
-        /* Панель статистики */
         .stats-bar {
             display: flex;
             flex-wrap: wrap;
             justify-content: center;
-            gap: 12px;
+            gap: 10px;
             background: #1f1a10cc;
             backdrop-filter: blur(8px);
-            padding: 12px;
+            padding: 10px;
             border-radius: 60px;
             margin: 16px 0;
         }
         .stat {
             background: #2c2418;
-            padding: 6px 16px;
+            padding: 5px 14px;
             border-radius: 40px;
-            font-size: 1rem;
+            font-size: 0.9rem;
             font-weight: bold;
             color: #f5e2b0;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
         }
-
-        /* Инвентарь */
         .inventory {
             display: flex;
             flex-wrap: wrap;
             justify-content: center;
             gap: 8px;
             background: #1f1a10cc;
-            padding: 12px;
+            padding: 10px;
             border-radius: 48px;
             margin-bottom: 16px;
         }
         .resource-card {
             background: #2c2418;
-            padding: 6px 14px;
+            padding: 5px 12px;
             border-radius: 40px;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
             font-weight: bold;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             color: #f5e2b0;
         }
-
-        /* Верстак */
         .crafting-panel {
             background: #1e1a10dd;
             border-radius: 24px;
-            padding: 16px;
+            padding: 12px;
             text-align: center;
             border: 1px solid #dba551;
             margin-bottom: 16px;
         }
         .craft-header {
-            font-size: 1.2rem;
-            margin-bottom: 12px;
+            font-size: 1.1rem;
+            margin-bottom: 10px;
             color: #ffd966;
         }
         .craft-grid {
             display: flex;
             flex-wrap: wrap;
             justify-content: center;
-            gap: 12px;
+            gap: 10px;
         }
         .craft-btn {
             background: #3a2a1a;
             border: none;
-            padding: 8px 16px;
+            padding: 6px 14px;
             border-radius: 40px;
             color: #ffeaac;
             font-weight: bold;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             cursor: pointer;
         }
-
-        /* Кнопки действий */
         .action-buttons {
             display: flex;
             flex-wrap: wrap;
@@ -130,11 +120,11 @@
         .action-btn {
             background: #2b2219;
             border: none;
-            padding: 12px 20px;
+            padding: 10px 18px;
             border-radius: 60px;
             color: #f9e2a1;
             font-weight: bold;
-            font-size: 1rem;
+            font-size: 0.9rem;
             cursor: pointer;
             box-shadow: 0 4px 0 #5a3a1a;
             transition: 0.05s linear;
@@ -142,18 +132,15 @@
         .action-btn:active {
             transform: translateY(2px);
         }
-
         .controls-hint {
             text-align: center;
             font-size: 0.7rem;
             color: #ffeaac;
             background: #1f2a0e80;
-            padding: 8px;
+            padding: 6px;
             border-radius: 60px;
             margin-bottom: 20px;
         }
-
-        /* Инвентарь модалка */
         .inventory-modal {
             display: none;
             position: fixed;
@@ -188,7 +175,7 @@
             background: #5a3a1a;
             border: none;
             font-size: 1.2rem;
-            padding: 5px 12px;
+            padding: 4px 12px;
             border-radius: 30px;
             cursor: pointer;
             color: #ffeaac;
@@ -196,7 +183,7 @@
         .inventory-slots {
             display: flex;
             flex-wrap: wrap;
-            gap: 12px;
+            gap: 10px;
             justify-content: center;
             margin-bottom: 20px;
         }
@@ -204,8 +191,8 @@
             background: #1f1a10;
             border: 2px solid #dba551;
             border-radius: 16px;
-            padding: 10px;
-            width: 90px;
+            padding: 8px;
+            width: 85px;
             text-align: center;
             cursor: pointer;
         }
@@ -213,16 +200,21 @@
             border: 3px solid #ffaa44;
             box-shadow: 0 0 10px #ffaa44;
         }
-        .inv-slot-icon { font-size: 1.6rem; }
-        .inv-slot-name { font-size: 0.7rem; color: #ffeaac; }
-        .equipped-info { background: #1f1a10; border-radius: 20px; padding: 12px; color: #ffeaac; }
+        .inv-slot-icon { font-size: 1.5rem; }
+        .inv-slot-name { font-size: 0.65rem; color: #ffeaac; }
+        .equipped-info { background: #1f1a10; border-radius: 20px; padding: 10px; color: #ffeaac; font-size: 0.8rem; }
+        @media (max-width: 600px) {
+            .stat { font-size: 0.7rem; padding: 3px 8px; }
+            .resource-card { font-size: 0.7rem; padding: 3px 8px; }
+            .action-btn { padding: 8px 12px; font-size: 0.8rem; }
+            .craft-btn { padding: 5px 10px; font-size: 0.7rem; }
+        }
     </style>
 </head>
 <body>
 <div class="game-container">
     <canvas id="gameCanvas" width="900" height="650"></canvas>
 
-    <!-- Статистика -->
     <div class="stats-bar">
         <div class="stat health"><span>❤️</span> <span id="healthValue">20</span></div>
         <div class="stat hunger"><span>🍗</span> <span id="hungerValue">16</span></div>
@@ -233,7 +225,6 @@
         <div class="stat inv-btn" id="inventoryToggleBtn"><span>🎒</span> <span>Инвентарь</span></div>
     </div>
 
-    <!-- Ресурсы -->
     <div class="inventory">
         <div class="resource-card"><span>🪵</span> <span id="woodCount">5</span></div>
         <div class="resource-card"><span>🪨</span> <span id="stoneCount">3</span></div>
@@ -246,13 +237,11 @@
         <div class="resource-card"><span>🗡️</span> <span id="weaponName">Кирка</span></div>
     </div>
 
-    <!-- Крафт -->
     <div class="crafting-panel">
         <div class="craft-header">🪵 ВЕРСТАК 🪵</div>
         <div class="craft-grid" id="craftGrid"></div>
     </div>
 
-    <!-- Кнопки действий -->
     <div class="action-buttons">
         <button class="action-btn" id="actionBtn">⛏️ ДЕЙСТВИЕ (E)</button>
         <button class="action-btn" id="furnaceBtn">🔥 ПЕЧЬ</button>
@@ -260,11 +249,10 @@
     </div>
     <div class="controls-hint">
         🕹️ ПК: WASD / стрелки — движение | E / Пробел — действие | I — инвентарь<br>
-        📱 Телефон: тяни палец по экрану (джойстик) | Нажми на кнопку действия
+        📱 Телефон: тяни палец по экрану (джойстик) | Нажми на зомби для выстрела
     </div>
 </div>
 
-<!-- Инвентарь модалка -->
 <div id="inventoryModal" class="inventory-modal">
     <div class="inventory-modal-content">
         <div class="inventory-modal-header">
