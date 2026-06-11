@@ -4,27 +4,33 @@
         if (!canvas) { console.error("Canvas не найден!"); return; }
         const ctx = canvas.getContext('2d');
 
-        // ========== РАЗМЕРЫ ==========
+        // ========== АДАПТАЦИЯ ПОД ЭКРАН (ВЕСЬ ЭКРАН) ==========
         let MAP_WIDTH = 16;
         let MAP_HEIGHT = 12;
         let TILE_SIZE = 50;
 
         function resizeCanvas() {
-            const maxSize = Math.min(window.innerWidth - 40, window.innerHeight - 280);
-            TILE_SIZE = Math.floor(maxSize / MAP_WIDTH);
-            if (TILE_SIZE < 30) TILE_SIZE = 30;
+            const maxWidth = window.innerWidth - 40;
+            const maxHeight = window.innerHeight - 280;
+            const sizeByWidth = Math.floor(maxWidth / MAP_WIDTH);
+            const sizeByHeight = Math.floor(maxHeight / MAP_HEIGHT);
+            TILE_SIZE = Math.min(sizeByWidth, sizeByHeight);
+            if (TILE_SIZE < 28) TILE_SIZE = 28;
             canvas.width = MAP_WIDTH * TILE_SIZE;
             canvas.height = MAP_HEIGHT * TILE_SIZE;
             canvas.style.width = '100%';
             canvas.style.height = 'auto';
+            canvas.style.display = 'block';
+            canvas.style.margin = '0 auto';
             if (worldMap.length) drawGame();
         }
         window.addEventListener('resize', resizeCanvas);
+        window.addEventListener('orientationchange', resizeCanvas);
 
         // ========== ПЕРЕМЕННЫЕ ==========
         let player = { x: 8, y: 6, health: 20, hunger: 16 };
         let wood = 5, stone = 3, food = 10, coal = 0, copper = 0, iron = 0;
-        let arrows = 0;
+        let arrows = 10;
         let survivedNights = 0;
         let gameActive = true;
         let deathReason = "";
@@ -53,7 +59,7 @@
         function getToolById(id) { return availableTools.find(t => t.id === id); }
         function hasWeapon(weaponId) { return availableWeapons.find(w => w.id === weaponId)?.crafted === true; }
 
-        // ========== МИР С ВОЗРОЖДЕНИЕМ БЛОКОВ ==========
+        // ========== МИР ==========
         let worldMap = [];
         let zombies = [];
         let dayTime = 0;
@@ -63,13 +69,13 @@
         let bonusChest = { active: false, x: 0, y: 0, spawnTimer: 60, health: 6, maxHealth: 6 };
 
         const blockStats = {
-            1: { name: "дерево", baseHealth: 8, drops: { wood: 3 }, toolRequired: 1, icon: "🌲", color: "#5C3E1F", lightColor: "#7C5E2B", respawnDelay: 10000 },
-            2: { name: "камень", baseHealth: 12, drops: { stone: 2 }, toolRequired: 2, icon: "🪨", color: "#6B6B6B", lightColor: "#8F8F8F", respawnDelay: 12000 },
-            3: { name: "ягоды", baseHealth: 4, drops: { food: 4 }, toolRequired: 1, icon: "🍓", color: "#B3470C", lightColor: "#E05E1E", respawnDelay: 8000 },
+            1: { name: "дерево", baseHealth: 8, drops: { wood: 3 }, toolRequired: 1, icon: "🌲", color: "#5C3E1F", lightColor: "#7C5E2B", respawnDelay: 8000 },
+            2: { name: "камень", baseHealth: 12, drops: { stone: 2 }, toolRequired: 2, icon: "🪨", color: "#6B6B6B", lightColor: "#8F8F8F", respawnDelay: 10000 },
+            3: { name: "ягоды", baseHealth: 4, drops: { food: 4 }, toolRequired: 1, icon: "🍓", color: "#B3470C", lightColor: "#E05E1E", respawnDelay: 7000 },
             4: { name: "сундук", baseHealth: 6, drops: { random: true }, toolRequired: 1, icon: "📦", color: "#8B5A2B", lightColor: "#D4A373", respawnDelay: null },
-            5: { name: "уголь", baseHealth: 10, drops: { coal: 3 }, toolRequired: 2, icon: "⚫", color: "#3A3A3A", lightColor: "#1A1A1A", respawnDelay: 14000 },
-            6: { name: "медь", baseHealth: 12, drops: { copper: 2 }, toolRequired: 2, icon: "🟤", color: "#B87333", lightColor: "#CD7F45", respawnDelay: 14000 },
-            7: { name: "железо", baseHealth: 15, drops: { iron: 1 }, toolRequired: 3, icon: "⚙️", color: "#8C8C8C", lightColor: "#B0B0B0", respawnDelay: 16000 }
+            5: { name: "уголь", baseHealth: 10, drops: { coal: 3 }, toolRequired: 2, icon: "⚫", color: "#3A3A3A", lightColor: "#1A1A1A", respawnDelay: 12000 },
+            6: { name: "медь", baseHealth: 12, drops: { copper: 2 }, toolRequired: 2, icon: "🟤", color: "#B87333", lightColor: "#CD7F45", respawnDelay: 12000 },
+            7: { name: "железо", baseHealth: 15, drops: { iron: 1 }, toolRequired: 3, icon: "⚙️", color: "#8C8C8C", lightColor: "#B0B0B0", respawnDelay: 14000 }
         };
 
         const recipes = [
@@ -168,28 +174,22 @@
             document.getElementById('restartBtn').onclick = () => location.reload();
         }
 
-        // ========== АТАКА И ДОБЫЧА ==========
-        function attackOrHarvest() {
-            if (!gameActive) return;
-            let targetZombie = null;
+        // ========== БЛИЖНИЙ БОЙ И ДОБЫЧА ==========
+        function meleeAttack() {
             for (let i = 0; i < zombies.length; i++) {
                 let z = zombies[i];
                 if (Math.abs(z.x - player.x) <= 1 && Math.abs(z.y - player.y) <= 1) {
-                    targetZombie = z;
-                    break;
+                    z.health -= weaponDamage;
+                    showFloatingText(`🗡️ ${weaponDamage}`, z.x, z.y, "#ffaa66");
+                    if (z.health <= 0) {
+                        zombies.splice(i, 1);
+                        showFloatingText("☠️ Зомби убит", z.x, z.y, "#aaffaa");
+                    }
+                    drawGame();
+                    return true;
                 }
             }
-            if (targetZombie) {
-                targetZombie.health -= weaponDamage;
-                showFloatingText(`🗡️ ${weaponDamage}`, targetZombie.x, targetZombie.y, "#ffaa66");
-                if (targetZombie.health <= 0) {
-                    zombies = zombies.filter(z => z !== targetZombie);
-                    showFloatingText("☠️ Зомби убит", targetZombie.x, targetZombie.y, "#aaffaa");
-                }
-                drawGame();
-                return;
-            }
-            harvestBlock();
+            return false;
         }
 
         function harvestBlock() {
@@ -252,6 +252,7 @@
             drawGame();
         }
 
+        // ========== ДАЛЬНИЙ БОЙ ==========
         function rangedAttack(tileX, tileY) {
             if (currentWeaponMode === "melee") {
                 showFloatingText("❌ Смени оружие на лук/арбалет", player.x, player.y, "#ff8888");
@@ -272,7 +273,10 @@
                     break;
                 }
             }
-            if (!targetZombie) return false;
+            if (!targetZombie) {
+                showFloatingText("❌ Промах!", tileX, tileY, "#ff8888");
+                return false;
+            }
             let damage = (currentWeaponMode === "bow") ? 8 : 12;
             arrows--;
             targetZombie.health -= damage;
@@ -284,6 +288,14 @@
             updateUI();
             drawGame();
             return true;
+        }
+
+        // ========== ГЛАВНОЕ ДЕЙСТВИЕ ==========
+        function performAction() {
+            if (!gameActive) return;
+            if (!meleeAttack()) {
+                harvestBlock();
+            }
         }
 
         function smelt() {
@@ -391,7 +403,7 @@
             return false;
         }
 
-        // ========== ТЕЛЕФОН: КАСАНИЯ ==========
+        // ========== ТЕЛЕФОН: ДЖОЙСТИК ==========
         let touchStartPos = null;
         let touchTimeout = null;
 
@@ -433,20 +445,20 @@
             if (touchTimeout) {
                 clearTimeout(touchTimeout);
                 if (touchStartPos && gameActive) {
-                    let targetZombieHit = false;
+                    let hitZombie = false;
                     for (let z of zombies) {
                         if (z.x === touchStartPos.tileX && z.y === touchStartPos.tileY) {
                             if (currentWeaponMode !== "melee") {
                                 rangedAttack(touchStartPos.tileX, touchStartPos.tileY);
                             } else {
-                                attackOrHarvest();
+                                performAction();
                             }
-                            targetZombieHit = true;
+                            hitZombie = true;
                             break;
                         }
                     }
-                    if (!targetZombieHit) {
-                        attackOrHarvest();
+                    if (!hitZombie) {
+                        performAction();
                     }
                 }
             }
@@ -478,7 +490,7 @@
                 keys[k] = true;
                 updateKeyboardMovement();
             }
-            if (k === ' ' || k === 'e') { e.preventDefault(); attackOrHarvest(); }
+            if (k === ' ' || k === 'e') { e.preventDefault(); performAction(); }
             if (k === 'i') { e.preventDefault(); openInventory(); }
         });
         window.addEventListener('keyup', (e) => { let k = e.key.toLowerCase(); delete keys[k]; updateKeyboardMovement(); });
@@ -495,16 +507,15 @@
             }
         }
 
-        // ========== ИГРОВОЙ ЦИКЛ ==========
-        function gameLoop() {
-            if (!gameActive) {
-                requestAnimationFrame(gameLoop);
-                return;
-            }
-            let now = Date.now();
+        // ========== ИГРОВОЙ ЦИКЛ (ТИКАЕТ КАЖДУЮ СЕКУНДУ) ==========
+        setInterval(() => {
+            if (!gameActive) return;
+            
+            const now = Date.now();
             if (now - lastTick >= 1000) {
                 lastTick = now;
                 cycleSeconds++;
+                
                 if (cycleSeconds >= 45) {
                     cycleSeconds = 0;
                     dayTime = 1 - dayTime;
@@ -520,6 +531,7 @@
                     }
                     updateUI();
                 }
+                
                 if (!bonusChest.active) {
                     bonusChest.spawnTimer--;
                     if (bonusChest.spawnTimer <= 0) {
@@ -546,6 +558,7 @@
                         updateUI();
                     }
                 }
+                
                 if (dayTime === 0 && player.hunger > 0 && Math.random() < 0.3) { 
                     player.hunger--; 
                     updateUI(); 
@@ -584,9 +597,7 @@
                 }
                 drawGame();
             }
-            drawGame();
-            requestAnimationFrame(gameLoop);
-        }
+        }, 100);
 
         // ========== ОТРИСОВКА ==========
         function drawGame() {
@@ -720,7 +731,7 @@
 
         // ========== КНОПКИ ==========
         const actionBtn = document.getElementById('actionBtn');
-        if (actionBtn) actionBtn.onclick = () => attackOrHarvest();
+        if (actionBtn) actionBtn.onclick = () => performAction();
         const furnaceBtn = document.getElementById('furnaceBtn');
         if (furnaceBtn) furnaceBtn.onclick = () => smelt();
         const inventoryBtn = document.getElementById('inventoryBtn');
@@ -767,7 +778,7 @@
         updateUI();
         resizeCanvas();
         updateMovement();
-        gameLoop();
+        setInterval(() => drawGame(), 50);
         window.addEventListener('resize', resizeCanvas);
     });
 })();
