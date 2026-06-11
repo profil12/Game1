@@ -1,4 +1,5 @@
 (function() {
+    // Ждём полной загрузки DOM
     document.addEventListener('DOMContentLoaded', () => {
         const canvas = document.getElementById('gameCanvas');
         if (!canvas) {
@@ -7,18 +8,18 @@
         }
         const ctx = canvas.getContext('2d');
 
-        // ========== РАЗМЕРЫ МИРА ==========
+        // Размеры мира
         let MAP_WIDTH = 16;
         let MAP_HEIGHT = 12;
         let TILE_SIZE = 50;
 
-        // ========== ИГРОК ==========
+        // Игрок
         let player = { x: 8, y: 6, health: 20, hunger: 16 };
         let wood = 5, stone = 3, food = 10, coal = 0, copper = 0, iron = 0;
         let arrows = 0;
         let survivedNights = 0;
 
-        // ========== ОРУЖИЕ И ИНСТРУМЕНТЫ ==========
+        // Оружие и инструменты
         let currentWeaponMode = "melee";
         let weaponDamage = 3;
         let toolTier = 1;
@@ -42,7 +43,7 @@
         function getToolById(id) { return availableTools.find(t => t.id === id); }
         function getWeaponById(id) { return availableWeapons.find(w => w.id === id); }
 
-        // ========== МИР И ЗОМБИ ==========
+        // Мир и зомби
         let worldMap = [];
         let zombies = [];
         let dayTime = 0;
@@ -52,7 +53,6 @@
         let floatingMessages = [];
         let bonusChest = { active: false, x: 0, y: 0, spawnTimer: 60 };
 
-        // ========== СТАТЫ БЛОКОВ ==========
         const blockStats = {
             1: { name: "дерево", baseHealth: 8, drops: { wood: 3 }, toolRequired: 1 },
             2: { name: "камень", baseHealth: 12, drops: { stone: 2 }, toolRequired: 2 },
@@ -63,7 +63,6 @@
             7: { name: "железо", baseHealth: 15, drops: { iron: 1 }, toolRequired: 3 }
         };
 
-        // ========== РЕЦЕПТЫ ==========
         const recipes = [
             { name: "Каменная кирка", need: { stone: 3, wood: 2 }, result: { toolId: "stone_pick" } },
             { name: "Медная кирка", need: { copper: 4, wood: 2 }, result: { toolId: "copper_pick" } },
@@ -75,7 +74,6 @@
             { name: "Хлеб 🍞", need: { food: 6 }, result: { hungerHeal: 8 } }
         ];
 
-        // ========== ИНИЦИАЛИЗАЦИЯ МИРА ==========
         function generateWorld() {
             worldMap = Array(MAP_HEIGHT).fill().map(() => Array(MAP_WIDTH).fill().map(() => ({ type: 0, health: 0, maxHealth: 0 })));
             function setBlock(type, x, y) {
@@ -98,7 +96,6 @@
             }
         }
 
-        // ========== UI ==========
         function updateUI() {
             const get = (id) => document.getElementById(id);
             if (get('healthValue')) get('healthValue').innerHTML = player.health;
@@ -129,8 +126,8 @@
             floatingMessages.push({ text, x: x * TILE_SIZE + 25, y: y * TILE_SIZE, life: 1.0, color });
         }
 
-        // ========== ДОБЫЧА БЛОКА ==========
         function harvestBlock() {
+            if (!worldMap.length) return;
             let bx = player.x, by = player.y;
             let block = worldMap[by]?.[bx];
             if (!block || block.type === 0) {
@@ -170,7 +167,6 @@
             drawGame();
         }
 
-        // ========== БЛИЖНИЙ БОЙ ==========
         function meleeAttackZombie() {
             for (let i = 0; i < zombies.length; i++) {
                 let z = zombies[i];
@@ -188,7 +184,6 @@
             return false;
         }
 
-        // ========== ДАЛЬНИЙ БОЙ ==========
         function rangedAttack(tileX, tileY) {
             if (currentWeaponMode === "melee") {
                 showFloatingText("❌ Смени оружие на лук/арбалет", player.x, player.y, "#ff8888");
@@ -219,7 +214,6 @@
             return true;
         }
 
-        // ========== ОБРАБОТКА ТАПА ==========
         function onTapTile(tileX, tileY) {
             for (let z of zombies) {
                 if (z.x === tileX && z.y === tileY) {
@@ -238,7 +232,6 @@
             harvestBlock();
         }
 
-        // ========== ПЕЧЬ ==========
         function smelt() {
             if (coal > 0) {
                 if (copper >= 2) {
@@ -250,7 +243,7 @@
                     drawGame();
                 } else if (copper >= 1) {
                     copper--;
-                    showFloatingText("🟤 Медь переплавлена, нужно 2 для железа", player.x, player.y, "#ccccaa");
+                    showFloatingText("🟤 Медь переплавлена", player.x, player.y, "#ccccaa");
                     coal--;
                     updateUI();
                     drawGame();
@@ -262,15 +255,12 @@
             }
         }
 
-        // ========== ИНВЕНТАРЬ ==========
         function openInventory() {
             const modal = document.getElementById('inventoryModal');
             if (!modal) return;
-            
             const slotsContainer = document.getElementById('inventorySlots');
             if (slotsContainer) {
                 slotsContainer.innerHTML = '';
-                // Инструменты
                 availableTools.forEach(tool => {
                     if (tool.crafted) {
                         const slot = document.createElement('div');
@@ -287,7 +277,6 @@
                         slotsContainer.appendChild(slot);
                     }
                 });
-                // Оружие
                 availableWeapons.forEach(weapon => {
                     if (weapon.crafted) {
                         const slot = document.createElement('div');
@@ -318,9 +307,13 @@
                     }
                 });
             }
-            document.getElementById('equippedTool').innerHTML = getToolById(equippedToolId)?.name || "Деревянная";
-            let weapon = availableWeapons.find(w => w.id === (currentWeaponMode === 'melee' ? 'melee_default' : currentWeaponMode));
-            document.getElementById('equippedWeapon').innerHTML = weapon ? weapon.name : "Кирка";
+            const eqTool = document.getElementById('equippedTool');
+            if (eqTool) eqTool.innerHTML = getToolById(equippedToolId)?.name || "Деревянная";
+            const eqWeapon = document.getElementById('equippedWeapon');
+            if (eqWeapon) {
+                let weapon = availableWeapons.find(w => w.id === (currentWeaponMode === 'melee' ? 'melee_default' : currentWeaponMode));
+                eqWeapon.innerHTML = weapon ? weapon.name : "Кирка";
+            }
             modal.style.display = 'flex';
         }
 
@@ -329,7 +322,7 @@
             if (modal) modal.style.display = 'none';
         }
 
-        // ========== ДЖОЙСТИК ==========
+        // Джойстик
         let joystickContainer, joystickBase, joystickThumb;
         let joystickActive = false;
         let joystickCenter = { x: 0, y: 0 };
@@ -412,13 +405,12 @@
                 joystickContainer.style.display = 'none';
                 joystickThumb.style.transform = 'translate(-50%, -50%)';
                 moveDirection.x = 0; moveDirection.y = 0;
-            } else if (!wasMoved && lastTapX !== null && lastTapX !== undefined) {
+            } else if (!wasMoved && lastTapX !== null && lastTapX !== undefined && gameActive) {
                 onTapTile(lastTapX, lastTapY);
             }
             wasMoved = false; lastTapX = null; lastTapY = null;
         }
 
-        // ========== ДВИЖЕНИЕ ==========
         function tryMove(dx, dy) {
             if (!gameActive) return false;
             let nx = player.x + dx, ny = player.y + dy;
@@ -443,7 +435,7 @@
             requestAnimationFrame(updateMovement);
         }
 
-        // ========== КЛАВИАТУРА ==========
+        // Клавиатура
         let keys = {};
         window.addEventListener('keydown', (e) => {
             if (!gameActive) return;
@@ -470,10 +462,10 @@
             }
         }
 
-        // ========== ОСНОВНОЙ ЦИКЛ ==========
+        // Игровой цикл
         function gameLoop() {
             let now = Date.now();
-            if (now - lastTick >= 1000) {
+            if (now - lastTick >= 1000 && gameActive) {
                 lastTick = now;
                 cycleSeconds++;
                 if (cycleSeconds >= 45) {
@@ -512,7 +504,6 @@
             requestAnimationFrame(gameLoop);
         }
 
-        // ========== ОТРИСОВКА ==========
         function drawGame() {
             if (!ctx || !worldMap.length) return;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -588,7 +579,6 @@
             if (dayTime === 1) { ctx.fillStyle = "rgba(0,0,40,0.6)"; ctx.fillRect(0, 0, canvas.width, canvas.height); }
         }
 
-        // ========== АДАПТАЦИЯ ПОД ЭКРАН ==========
         function resizeCanvas() {
             TILE_SIZE = Math.floor(Math.min(window.innerWidth - 80, 600) / MAP_WIDTH);
             if (TILE_SIZE < 30) TILE_SIZE = 30;
@@ -596,10 +586,9 @@
             canvas.height = MAP_HEIGHT * TILE_SIZE;
             canvas.style.width = '100%';
             canvas.style.height = 'auto';
-            drawGame();
+            if (worldMap.length) drawGame();
         }
 
-        // ========== КРАФТ ==========
         function renderCrafting() {
             const grid = document.getElementById('craftGrid');
             if (!grid) return;
@@ -647,7 +636,7 @@
             });
         }
 
-        // ========== ПОДКЛЮЧАЕМ КНОПКИ ==========
+        // Подключаем кнопки с проверкой существования
         const actionBtn = document.getElementById('actionBtn');
         if (actionBtn) actionBtn.onclick = () => harvestBlock();
         const furnaceBtn = document.getElementById('furnaceBtn');
@@ -659,7 +648,7 @@
         const closeInv = document.getElementById('closeInventoryBtn');
         if (closeInv) closeInv.onclick = () => closeInventory();
 
-        // Кнопка смены оружия (создаём если нет)
+        // Создаём кнопку смены оружия, если её нет
         if (!document.getElementById('nextWeaponBtn')) {
             const weaponBtn = document.createElement('button');
             weaponBtn.id = 'nextWeaponBtn';
@@ -683,7 +672,7 @@
             };
         }
 
-        // ========== ЗАПУСК ==========
+        // Запуск игры
         generateWorld();
         renderCrafting();
         updateUI();
