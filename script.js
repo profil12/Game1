@@ -1,27 +1,23 @@
 (function() {
     document.addEventListener('DOMContentLoaded', () => {
         const canvas = document.getElementById('gameCanvas');
-        if (!canvas) { console.error("Canvas не найден!"); return; }
+        if (!canvas) return;
         const ctx = canvas.getContext('2d');
 
-        // ========== АДАПТАЦИЯ ПОД ЭКРАН (ВЕСЬ ЭКРАН) ==========
+        // ========== РАЗМЕРЫ МИРА ==========
         let MAP_WIDTH = 16;
         let MAP_HEIGHT = 12;
         let TILE_SIZE = 50;
 
         function resizeCanvas() {
-            const maxWidth = window.innerWidth - 40;
-            const maxHeight = window.innerHeight - 280;
-            const sizeByWidth = Math.floor(maxWidth / MAP_WIDTH);
-            const sizeByHeight = Math.floor(maxHeight / MAP_HEIGHT);
-            TILE_SIZE = Math.min(sizeByWidth, sizeByHeight);
-            if (TILE_SIZE < 28) TILE_SIZE = 28;
+            const container = canvas.parentElement;
+            const maxWidth = container.clientWidth - 20;
+            TILE_SIZE = Math.floor(maxWidth / MAP_WIDTH);
+            if (TILE_SIZE < 30) TILE_SIZE = 30;
             canvas.width = MAP_WIDTH * TILE_SIZE;
             canvas.height = MAP_HEIGHT * TILE_SIZE;
             canvas.style.width = '100%';
             canvas.style.height = 'auto';
-            canvas.style.display = 'block';
-            canvas.style.margin = '0 auto';
             if (worldMap.length) drawGame();
         }
         window.addEventListener('resize', resizeCanvas);
@@ -160,14 +156,14 @@
                 position: fixed; top: 0; left: 0; width: 100%; height: 100%;
                 background: rgba(0,0,0,0.9); backdrop-filter: blur(8px);
                 display: flex; justify-content: center; align-items: center;
-                z-index: 10000; font-family: monospace;
+                z-index: 10000;
             `;
             overlay.innerHTML = `
                 <div style="background: #2A1A0A; border: 3px solid #FF6644; border-radius: 48px; padding: 30px; text-align: center; color: #FFCC88;">
                     <div style="font-size: 2rem;">💀 ВЫ ПОГИБЛИ 💀</div>
-                    <div style="margin-top: 15px; font-size: 1.2rem;">${deathReason}</div>
+                    <div style="margin-top: 15px;">${deathReason}</div>
                     <div style="margin-top: 10px;">Выжито дней: ${survivedNights}</div>
-                    <button id="restartBtn" style="margin-top: 20px; background: #FF8844; border: none; padding: 10px 30px; border-radius: 40px; font-size: 1.2rem; font-weight: bold; cursor: pointer;">Играть снова</button>
+                    <button id="restartBtn" style="margin-top: 20px; background: #FF8844; border: none; padding: 10px 30px; border-radius: 40px; font-size: 1.2rem; cursor: pointer;">Играть снова</button>
                 </div>
             `;
             document.body.appendChild(overlay);
@@ -290,7 +286,6 @@
             return true;
         }
 
-        // ========== ГЛАВНОЕ ДЕЙСТВИЕ ==========
         function performAction() {
             if (!gameActive) return;
             if (!meleeAttack()) {
@@ -507,7 +502,7 @@
             }
         }
 
-        // ========== ИГРОВОЙ ЦИКЛ (ТИКАЕТ КАЖДУЮ СЕКУНДУ) ==========
+        // ========== ИГРОВОЙ ЦИКЛ ==========
         setInterval(() => {
             if (!gameActive) return;
             
@@ -634,7 +629,6 @@
                 ctx.fillStyle = '#DAA520';
                 ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
                 ctx.fillStyle = '#FFD700';
-                ctx.font = `${TILE_SIZE * 0.5}px monospace`;
                 ctx.fillText('🎁', x + TILE_SIZE * 0.25, y + TILE_SIZE * 0.7);
                 ctx.fillStyle = '#FFAA44';
                 ctx.fillRect(x + 5, y + 2, (bonusChest.health / bonusChest.maxHealth) * (TILE_SIZE - 10), 4);
@@ -650,8 +644,6 @@
             ctx.fillStyle = "#2E241F";
             ctx.fillRect(px + 16, py + 10, 4, 4);
             ctx.fillRect(px + TILE_SIZE - 20, py + 10, 4, 4);
-            ctx.fillStyle = "#1F1408";
-            ctx.fillRect(px + 10, py + 2, TILE_SIZE - 20, 5);
             ctx.fillStyle = tool?.color || "#B57A3B";
             ctx.fillRect(px + TILE_SIZE - 14, py + TILE_SIZE - 20, 8, 16);
             zombies.forEach(z => {
