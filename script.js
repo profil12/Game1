@@ -10,8 +10,7 @@
         let TILE_SIZE = 50;
 
         function resizeCanvas() {
-            const container = canvas.parentElement;
-            const maxSize = Math.min(window.innerWidth - 40, window.innerHeight - 300);
+            const maxSize = Math.min(window.innerWidth - 40, window.innerHeight - 280);
             TILE_SIZE = Math.floor(maxSize / MAP_WIDTH);
             if (TILE_SIZE < 30) TILE_SIZE = 30;
             canvas.width = MAP_WIDTH * TILE_SIZE;
@@ -25,11 +24,13 @@
         window.addEventListener('resize', resizeCanvas);
         window.addEventListener('orientationchange', resizeCanvas);
 
-        // ========== ИГРОК ==========
+        // ========== ПЕРЕМЕННЫЕ ==========
         let player = { x: 8, y: 6, health: 20, hunger: 16 };
         let wood = 5, stone = 3, food = 10, coal = 0, copper = 0, iron = 0;
         let arrows = 0;
         let survivedNights = 0;
+        let gameActive = true;
+        let deathReason = "";
 
         // ========== ОРУЖИЕ И ИНСТРУМЕНТЫ ==========
         let currentWeaponMode = "melee";
@@ -38,18 +39,18 @@
         let equippedToolId = "wood_pick";
 
         let availableTools = [
-            { id: "wood_pick", name: "Деревянная кирка", tier: 1, damage: 2, crafted: true },
-            { id: "stone_pick", name: "Каменная кирка", tier: 2, damage: 4, crafted: false },
-            { id: "copper_pick", name: "Медная кирка", tier: 3, damage: 6, crafted: false },
-            { id: "iron_pick", name: "Железная кирка", tier: 4, damage: 9, crafted: false }
+            { id: "wood_pick", name: "Деревянная кирка", tier: 1, damage: 2, crafted: true, icon: "🪵", color: "#B57A3B" },
+            { id: "stone_pick", name: "Каменная кирка", tier: 2, damage: 4, crafted: false, icon: "🪨", color: "#7E8C8D" },
+            { id: "copper_pick", name: "Медная кирка", tier: 3, damage: 6, crafted: false, icon: "🟤", color: "#D98C45" },
+            { id: "iron_pick", name: "Железная кирка", tier: 4, damage: 9, crafted: false, icon: "⚙️", color: "#DCDCDC" }
         ];
 
         let availableWeapons = [
-            { id: "melee_default", name: "Кирка", damage: 3, crafted: true },
-            { id: "copper_sword", name: "Медный меч", damage: 6, crafted: false },
-            { id: "iron_sword", name: "Железный меч", damage: 9, crafted: false },
-            { id: "bow", name: "Лук", damage: 8, crafted: false },
-            { id: "crossbow", name: "Арбалет", damage: 12, crafted: false }
+            { id: "melee_default", name: "Кирка", damage: 3, crafted: true, icon: "⛏️" },
+            { id: "copper_sword", name: "Медный меч", damage: 6, crafted: false, icon: "🗡️" },
+            { id: "iron_sword", name: "Железный меч", damage: 9, crafted: false, icon: "⚔️" },
+            { id: "bow", name: "Лук", damage: 8, crafted: false, icon: "🏹" },
+            { id: "crossbow", name: "Арбалет", damage: 12, crafted: false, icon: "🎯" }
         ];
 
         function getToolById(id) { return availableTools.find(t => t.id === id); }
@@ -61,18 +62,18 @@
         let dayTime = 0;
         let cycleSeconds = 0;
         let lastTick = Date.now();
-        let gameActive = true;
         let floatingMessages = [];
         let bonusChest = { active: false, x: 0, y: 0, spawnTimer: 60, health: 6, maxHealth: 6 };
 
+        // ========== СТАТЫ БЛОКОВ (с цветами и иконками) ==========
         const blockStats = {
-            1: { name: "дерево", baseHealth: 8, drops: { wood: 3 }, toolRequired: 1, icon: "🌲", color1: "#5C3E1F", color2: "#7C5E2B" },
-            2: { name: "камень", baseHealth: 12, drops: { stone: 2 }, toolRequired: 2, icon: "🪨", color1: "#6B6B6B", color2: "#8F8F8F" },
-            3: { name: "ягоды", baseHealth: 4, drops: { food: 4 }, toolRequired: 1, icon: "🍓", color1: "#B3470C", color2: "#E05E1E" },
-            4: { name: "сундук", baseHealth: 6, drops: { random: true }, toolRequired: 1, icon: "📦", color1: "#8B5A2B", color2: "#D4A373" },
-            5: { name: "уголь", baseHealth: 10, drops: { coal: 3 }, toolRequired: 2, icon: "⚫", color1: "#3A3A3A", color2: "#1A1A1A" },
-            6: { name: "медь", baseHealth: 12, drops: { copper: 2 }, toolRequired: 2, icon: "🟤", color1: "#B87333", color2: "#CD7F45" },
-            7: { name: "железо", baseHealth: 15, drops: { iron: 1 }, toolRequired: 3, icon: "⚙️", color1: "#8C8C8C", color2: "#B0B0B0" }
+            1: { name: "дерево", baseHealth: 8, drops: { wood: 3 }, toolRequired: 1, icon: "🌲", color: "#5C3E1F", lightColor: "#7C5E2B" },
+            2: { name: "камень", baseHealth: 12, drops: { stone: 2 }, toolRequired: 2, icon: "🪨", color: "#6B6B6B", lightColor: "#8F8F8F" },
+            3: { name: "ягоды", baseHealth: 4, drops: { food: 4 }, toolRequired: 1, icon: "🍓", color: "#B3470C", lightColor: "#E05E1E" },
+            4: { name: "сундук", baseHealth: 6, drops: { random: true }, toolRequired: 1, icon: "📦", color: "#8B5A2B", lightColor: "#D4A373" },
+            5: { name: "уголь", baseHealth: 10, drops: { coal: 3 }, toolRequired: 2, icon: "⚫", color: "#3A3A3A", lightColor: "#1A1A1A" },
+            6: { name: "медь", baseHealth: 12, drops: { copper: 2 }, toolRequired: 2, icon: "🟤", color: "#B87333", lightColor: "#CD7F45" },
+            7: { name: "железо", baseHealth: 15, drops: { iron: 1 }, toolRequired: 3, icon: "⚙️", color: "#8C8C8C", lightColor: "#B0B0B0" }
         };
 
         const recipes = [
@@ -121,13 +122,8 @@
             if (get('arrowCount')) get('arrowCount').innerHTML = arrows;
             let tool = getToolById(equippedToolId);
             if (get('toolLevel')) get('toolLevel').innerHTML = tool ? tool.name : "Деревянная";
-            
-            let weaponName = "Кирка";
-            if (currentWeaponMode === 'bow' && hasWeapon('bow')) weaponName = "Лук";
-            else if (currentWeaponMode === 'crossbow' && hasWeapon('crossbow')) weaponName = "Арбалет";
-            else if (currentWeaponMode === 'melee') weaponName = "Кирка/меч";
+            let weaponName = currentWeaponMode === 'melee' ? 'Кирка/меч' : (currentWeaponMode === 'bow' ? 'Лук' : 'Арбалет');
             if (get('weaponName')) get('weaponName').innerHTML = weaponName;
-            
             if (get('timeLeft')) get('timeLeft').innerHTML = (45 - cycleSeconds) + "с";
             if (get('dayIcon')) get('dayIcon').innerHTML = dayTime === 0 ? "🌞" : "🌙";
             if (get('dayPhase')) get('dayPhase').innerHTML = dayTime === 0 ? "День" : "Ночь";
@@ -143,11 +139,31 @@
             floatingMessages.push({ text, x: x * TILE_SIZE + 25, y: y * TILE_SIZE, life: 1.0, color });
         }
 
+        function showDeathScreen() {
+            gameActive = false;
+            const overlay = document.createElement('div');
+            overlay.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                background: rgba(0,0,0,0.9); backdrop-filter: blur(8px);
+                display: flex; justify-content: center; align-items: center;
+                z-index: 10000; font-family: monospace;
+            `;
+            overlay.innerHTML = `
+                <div style="background: #2A1A0A; border: 3px solid #FF6644; border-radius: 48px; padding: 30px; text-align: center; color: #FFCC88;">
+                    <div style="font-size: 2rem;">💀 ВЫ ПОГИБЛИ 💀</div>
+                    <div style="margin-top: 15px; font-size: 1.2rem;">${deathReason}</div>
+                    <div style="margin-top: 10px;">Выжито дней: ${survivedNights}</div>
+                    <button id="restartBtn" style="margin-top: 20px; background: #FF8844; border: none; padding: 10px 30px; border-radius: 40px; font-size: 1.2rem; font-weight: bold; cursor: pointer;">Играть снова</button>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+            document.getElementById('restartBtn').onclick = () => location.reload();
+        }
+
         function harvestBlock() {
-            if (!worldMap.length) return;
+            if (!gameActive || !worldMap.length) return;
             let bx = player.x, by = player.y;
             
-            // Бонусный сундук
             if (bonusChest.active && bx === bonusChest.x && by === bonusChest.y) {
                 bonusChest.health -= (getToolById(equippedToolId)?.damage || 2);
                 showFloatingText(`💥 Сундук: ${bonusChest.health}/${bonusChest.maxHealth}`, bx, by, "#ffaa66");
@@ -174,8 +190,7 @@
                 showFloatingText("❌ Слишком крепко", bx, by, "#ff8888");
                 return;
             }
-            let tool = getToolById(equippedToolId);
-            let damage = tool ? tool.damage : 2;
+            let damage = getToolById(equippedToolId)?.damage || 2;
             block.health -= damage;
             if (block.health <= 0) {
                 let drops = stats.drops;
@@ -224,12 +239,8 @@
                 showFloatingText("❌ Смени оружие на лук/арбалет", player.x, player.y, "#ff8888");
                 return false;
             }
-            if (currentWeaponMode === 'bow' && !hasWeapon('bow')) {
-                showFloatingText("❌ У вас нет лука! Скрафтите его", player.x, player.y, "#ff8888");
-                return false;
-            }
-            if (currentWeaponMode === 'crossbow' && !hasWeapon('crossbow')) {
-                showFloatingText("❌ У вас нет арбалета! Скрафтите его", player.x, player.y, "#ff8888");
+            if ((currentWeaponMode === 'bow' && !hasWeapon('bow')) || (currentWeaponMode === 'crossbow' && !hasWeapon('crossbow'))) {
+                showFloatingText("❌ У вас нет этого оружия! Скрафтите его", player.x, player.y, "#ff8888");
                 return false;
             }
             if (arrows <= 0) {
@@ -276,29 +287,28 @@
         }
 
         function smelt() {
-            if (coal > 0) {
-                if (copper >= 2) {
-                    copper -= 2;
-                    iron += 1;
-                    coal--;
-                    showFloatingText("⚙️ Железо выплавлено!", player.x, player.y, "#aaffaa");
-                    updateUI();
-                    drawGame();
-                } else if (copper >= 1) {
-                    copper--;
-                    showFloatingText("🟤 Медь переплавлена, нужно 2 для железа", player.x, player.y, "#ccccaa");
-                    coal--;
-                    updateUI();
-                    drawGame();
-                } else {
-                    showFloatingText("❌ Нет руды для плавки!", player.x, player.y, "#ff8888");
-                }
+            if (!gameActive) return;
+            if (coal > 0 && copper >= 2) {
+                copper -= 2;
+                iron += 1;
+                coal--;
+                showFloatingText("⚙️ Железо выплавлено!", player.x, player.y, "#aaffaa");
+                updateUI();
+                drawGame();
+            } else if (coal > 0 && copper >= 1) {
+                copper--;
+                showFloatingText("🟤 Медь переплавлена, нужно 2 для железа", player.x, player.y, "#ccccaa");
+                coal--;
+                updateUI();
+                drawGame();
             } else {
-                showFloatingText("❌ Нет угля!", player.x, player.y, "#ff8888");
+                showFloatingText(coal > 0 ? "❌ Нет руды!" : "❌ Нет угля!", player.x, player.y, "#ff8888");
             }
         }
 
+        // ========== ИНВЕНТАРЬ ==========
         function openInventory() {
+            if (!gameActive) return;
             const modal = document.getElementById('inventoryModal');
             if (!modal) return;
             const slotsContainer = document.getElementById('inventorySlots');
@@ -309,7 +319,7 @@
                         const slot = document.createElement('div');
                         slot.className = 'inv-slot';
                         if (equippedToolId === tool.id) slot.classList.add('equipped');
-                        slot.innerHTML = `<div class="inv-slot-icon">${tool.tier === 1 ? '🪵' : (tool.tier === 2 ? '🪨' : (tool.tier === 3 ? '🟤' : '⚙️'))}</div><div class="inv-slot-name">${tool.name}</div><div class="inv-slot-damage">${tool.damage} урона</div>`;
+                        slot.innerHTML = `<div class="inv-slot-icon">${tool.icon}</div><div class="inv-slot-name">${tool.name}</div><div class="inv-slot-damage">${tool.damage} урона</div>`;
                         slot.onclick = () => {
                             equippedToolId = tool.id;
                             toolTier = tool.tier;
@@ -324,13 +334,11 @@
                     if (weapon.crafted) {
                         const slot = document.createElement('div');
                         slot.className = 'inv-slot';
-                        let isEquipped = false;
-                        if (weapon.id === 'melee_default' && currentWeaponMode === 'melee') isEquipped = true;
-                        if (weapon.id === 'bow' && currentWeaponMode === 'bow') isEquipped = true;
-                        if (weapon.id === 'crossbow' && currentWeaponMode === 'crossbow') isEquipped = true;
+                        let isEquipped = (weapon.id === 'melee_default' && currentWeaponMode === 'melee') ||
+                                         (weapon.id === 'bow' && currentWeaponMode === 'bow') ||
+                                         (weapon.id === 'crossbow' && currentWeaponMode === 'crossbow');
                         if (isEquipped) slot.classList.add('equipped');
-                        let icon = weapon.id === 'melee_default' ? '⛏️' : (weapon.id === 'copper_sword' ? '🗡️' : (weapon.id === 'iron_sword' ? '⚔️' : (weapon.id === 'bow' ? '🏹' : '🎯')));
-                        slot.innerHTML = `<div class="inv-slot-icon">${icon}</div><div class="inv-slot-name">${weapon.name}</div><div class="inv-slot-damage">${weapon.damage} урона</div>`;
+                        slot.innerHTML = `<div class="inv-slot-icon">${weapon.icon}</div><div class="inv-slot-name">${weapon.name}</div><div class="inv-slot-damage">${weapon.damage} урона</div>`;
                         slot.onclick = () => {
                             if (weapon.id === 'melee_default') {
                                 currentWeaponMode = 'melee';
@@ -357,10 +365,7 @@
             if (eqTool) eqTool.innerHTML = getToolById(equippedToolId)?.name || "Деревянная";
             const eqWeapon = document.getElementById('equippedWeapon');
             if (eqWeapon) {
-                let weaponName = "Кирка";
-                if (currentWeaponMode === 'bow' && hasWeapon('bow')) weaponName = "Лук";
-                else if (currentWeaponMode === 'crossbow' && hasWeapon('crossbow')) weaponName = "Арбалет";
-                else if (currentWeaponMode === 'melee') weaponName = "Кирка/меч";
+                let weaponName = currentWeaponMode === 'melee' ? 'Кирка/меч' : (currentWeaponMode === 'bow' ? 'Лук' : 'Арбалет');
                 eqWeapon.innerHTML = weaponName;
             }
             modal.style.display = 'flex';
@@ -392,6 +397,8 @@
         let joystickCenter = { x: 0, y: 0 };
         let joystickBase = null;
         let joystickThumb = null;
+        let touchStartPos = null;
+        let touchTimeout = null;
 
         function initJoystick() {
             const container = document.createElement('div');
@@ -405,10 +412,8 @@
             container.appendChild(joystickBase);
             document.body.appendChild(container);
 
-            let touchStartPos = null;
-            let touchTimeout = null;
-
             canvas.addEventListener('touchstart', (e) => {
+                if (!gameActive) return;
                 e.preventDefault();
                 const touch = e.touches[0];
                 const rect = canvas.getBoundingClientRect();
@@ -420,7 +425,6 @@
                 let tileY = Math.floor(canvasY / TILE_SIZE);
                 
                 touchStartPos = { x: touch.clientX, y: touch.clientY, tileX, tileY };
-                
                 touchTimeout = setTimeout(() => {
                     container.style.display = 'block';
                     const rectC = container.getBoundingClientRect();
@@ -432,7 +436,7 @@
             });
 
             canvas.addEventListener('touchmove', (e) => {
-                if (!touchStartPos) return;
+                if (!touchStartPos || !gameActive) return;
                 e.preventDefault();
                 const touch = e.touches[0];
                 let dx = touch.clientX - touchStartPos.x;
@@ -447,8 +451,6 @@
                         joystickThumb.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
                         moveDirection.x = Math.cos(angle) * (dist / 50);
                         moveDirection.y = Math.sin(angle) * (dist / 50);
-                    } else {
-                        moveDirection = { x: 0, y: 0 };
                     }
                     touchStartPos = null;
                 }
@@ -457,7 +459,7 @@
             canvas.addEventListener('touchend', () => {
                 if (touchTimeout) {
                     clearTimeout(touchTimeout);
-                    if (touchStartPos) {
+                    if (touchStartPos && gameActive) {
                         onTapTile(touchStartPos.tileX, touchStartPos.tileY);
                     }
                 }
@@ -512,8 +514,12 @@
 
         // ========== ИГРОВОЙ ЦИКЛ ==========
         function gameLoop() {
+            if (!gameActive) {
+                requestAnimationFrame(gameLoop);
+                return;
+            }
             let now = Date.now();
-            if (now - lastTick >= 1000 && gameActive) {
+            if (now - lastTick >= 1000) {
                 lastTick = now;
                 cycleSeconds++;
                 if (cycleSeconds >= 45) {
@@ -541,29 +547,35 @@
                         bonusChest.maxHealth = 6;
                         bonusChest.spawnTimer = 60;
                         showFloatingText("✨ Бонусный сундук появился!", bonusChest.x, bonusChest.y, "#ffaa44");
+                        updateUI();
                     }
-                    updateUI();
                 }
-                if (dayTime === 0 && player.hunger > 0 && Math.random() < 0.3) { player.hunger--; updateUI(); }
+                if (dayTime === 0 && player.hunger > 0 && Math.random() < 0.3) { 
+                    player.hunger--; 
+                    updateUI(); 
+                }
                 if (player.hunger <= 0) {
                     player.health = Math.max(0, player.health - 1);
                     updateUI();
-                    if (player.health <= 0) { gameActive = false; alert("💀 Вы погибли от голода! Обновите страницу."); }
+                    if (player.health <= 0) {
+                        deathReason = "💀 Вы умерли от голода!";
+                        showDeathScreen();
+                        return;
+                    }
                 }
                 
-                // Зомби атакуют и двигаются
                 for (let i = 0; i < zombies.length; i++) {
                     let z = zombies[i];
                     let dx = Math.sign(player.x - z.x);
                     let dy = Math.sign(player.y - z.y);
-                    
                     if (Math.abs(player.x - z.x) <= 1 && Math.abs(player.y - z.y) <= 1) {
                         player.health = Math.max(0, player.health - 4);
                         showFloatingText(`💔 Зомби атакует! -4`, player.x, player.y, "#ff5555");
                         updateUI();
                         if (player.health <= 0) {
-                            gameActive = false;
-                            alert("💀 Вас убили зомби! Обновите страницу.");
+                            deathReason = "🧟 Вас убили зомби!";
+                            showDeathScreen();
+                            return;
                         }
                     } else {
                         let newX = z.x + dx;
@@ -580,31 +592,29 @@
             requestAnimationFrame(gameLoop);
         }
 
-        // ========== ОТРИСОВКА (нормальная) ==========
+        // ========== ОТРИСОВКА (КРАСИВАЯ) ==========
         function drawGame() {
             if (!ctx || !worldMap.length) return;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
             for (let row = 0; row < MAP_HEIGHT; row++) {
                 for (let col = 0; col < MAP_WIDTH; col++) {
                     let b = worldMap[row]?.[col];
                     if (!b) continue;
                     let x = col * TILE_SIZE, y = row * TILE_SIZE;
-                    let stats = blockStats[b.type];
                     if (b.type === 0) {
                         ctx.fillStyle = '#5F7E4A';
                         ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
                         ctx.fillStyle = '#6F9E55';
                         ctx.fillRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
-                    } else if (stats) {
-                        ctx.fillStyle = stats.color1;
+                    } else {
+                        let stats = blockStats[b.type];
+                        ctx.fillStyle = stats.color;
                         ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-                        ctx.fillStyle = stats.color2;
+                        ctx.fillStyle = stats.lightColor;
                         ctx.fillRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
-                        ctx.fillStyle = '#FFF';
+                        ctx.fillStyle = 'white';
                         ctx.font = `${TILE_SIZE * 0.5}px monospace`;
                         ctx.fillText(stats.icon, x + TILE_SIZE * 0.25, y + TILE_SIZE * 0.7);
-                        // Полоска здоровья
                         if (b.health < b.maxHealth) {
                             ctx.fillStyle = '#FFAA44';
                             ctx.fillRect(x + 5, y + 2, (b.health / b.maxHealth) * (TILE_SIZE - 10), 4);
@@ -612,8 +622,6 @@
                     }
                 }
             }
-            
-            // Бонусный сундук
             if (bonusChest.active && worldMap[bonusChest.y]?.[bonusChest.x]?.type === 0) {
                 let x = bonusChest.x * TILE_SIZE, y = bonusChest.y * TILE_SIZE;
                 ctx.fillStyle = '#DAA520';
@@ -624,9 +632,8 @@
                 ctx.fillStyle = '#FFAA44';
                 ctx.fillRect(x + 5, y + 2, (bonusChest.health / bonusChest.maxHealth) * (TILE_SIZE - 10), 4);
             }
-            
-            // Стив (аккуратно внутри клетки)
             let px = player.x * TILE_SIZE, py = player.y * TILE_SIZE;
+            let tool = getToolById(equippedToolId);
             ctx.fillStyle = "#4C7A4A";
             ctx.fillRect(px + 6, py + 12, TILE_SIZE - 12, TILE_SIZE - 18);
             ctx.fillStyle = "#3B2F2A";
@@ -638,8 +645,8 @@
             ctx.fillRect(px + TILE_SIZE - 20, py + 10, 4, 4);
             ctx.fillStyle = "#1F1408";
             ctx.fillRect(px + 10, py + 2, TILE_SIZE - 20, 5);
-            
-            // Зомби
+            ctx.fillStyle = tool?.color || "#B57A3B";
+            ctx.fillRect(px + TILE_SIZE - 14, py + TILE_SIZE - 20, 8, 16);
             zombies.forEach(z => {
                 let zx = z.x * TILE_SIZE, zy = z.y * TILE_SIZE;
                 ctx.fillStyle = "#2F6B3A";
@@ -652,15 +659,12 @@
                 ctx.fillStyle = "#AA0000";
                 ctx.fillRect(zx + 5, zy + 2, (z.health / 20) * (TILE_SIZE - 10), 4);
             });
-            
-            // Плавающие тексты
             floatingMessages = floatingMessages.filter(m => { m.life -= 0.03; m.y -= 1; return m.life > 0; });
             floatingMessages.forEach(m => {
                 ctx.font = "bold 14px monospace";
                 ctx.fillStyle = m.color;
                 ctx.fillText(m.text, m.x - 20, m.y - 12);
             });
-            
             if (dayTime === 1) { 
                 ctx.fillStyle = "rgba(0,0,40,0.5)"; 
                 ctx.fillRect(0, 0, canvas.width, canvas.height); 
@@ -676,6 +680,7 @@
                 btn.innerText = rec.name;
                 btn.className = 'craft-btn';
                 btn.onclick = () => {
+                    if (!gameActive) return;
                     let ok = true;
                     for (let [mat, amt] of Object.entries(rec.need)) {
                         if (mat === 'stone' && stone < amt) ok = false;
@@ -684,7 +689,10 @@
                         if (mat === 'copper' && copper < amt) ok = false;
                         if (mat === 'food' && food < amt) ok = false;
                     }
-                    if (!ok) { alert("❌ Не хватает ресурсов!"); return; }
+                    if (!ok) { 
+                        showFloatingText("❌ Не хватает ресурсов!", player.x, player.y, "#ff8888");
+                        return; 
+                    }
                     for (let [mat, amt] of Object.entries(rec.need)) {
                         if (mat === 'stone') stone -= amt;
                         if (mat === 'wood') wood -= amt;
@@ -695,17 +703,17 @@
                     if (rec.result.toolId) {
                         let tool = availableTools.find(t => t.id === rec.result.toolId);
                         if (tool) tool.crafted = true;
-                        alert(`✨ Вы скрафтили ${tool.name}!`);
+                        showFloatingText(`✨ Вы скрафтили ${tool.name}!`, player.x, player.y, "#aaffaa");
                     }
                     if (rec.result.weaponId) {
                         let weapon = availableWeapons.find(w => w.id === rec.result.weaponId);
                         if (weapon) weapon.crafted = true;
                         if (rec.result.extraArrows) arrows += rec.result.extraArrows;
-                        alert(`✨ Вы скрафтили ${weapon.name}!`);
+                        showFloatingText(`✨ Вы скрафтили ${weapon.name}!`, player.x, player.y, "#aaffaa");
                     }
                     if (rec.result.hungerHeal) {
                         player.hunger = Math.min(20, player.hunger + rec.result.hungerHeal);
-                        alert(`🍞 Вы восстановили голод!`);
+                        showFloatingText(`🍞 Вы восстановили голод!`, player.x, player.y, "#aaffaa");
                     }
                     updateUI();
                     drawGame();
@@ -726,7 +734,6 @@
         const closeInv = document.getElementById('closeInventoryBtn');
         if (closeInv) closeInv.onclick = () => closeInventory();
 
-        // Кнопка смены оружия
         let nextWeaponBtn = document.getElementById('nextWeaponBtn');
         if (!nextWeaponBtn) {
             const weaponBtn = document.createElement('button');
@@ -739,6 +746,7 @@
         }
         if (nextWeaponBtn) {
             nextWeaponBtn.onclick = () => {
+                if (!gameActive) return;
                 const weapons = ['melee', 'bow', 'crossbow'];
                 let idx = weapons.indexOf(currentWeaponMode);
                 let attempts = 0;
