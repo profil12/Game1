@@ -358,7 +358,7 @@
             return false;
         }
 
-        // ========== ТЕЛЕФОН: ДЖОЙСТИК И СТРЕЛЬБА ==========
+        // ========== ТЕЛЕФОН: ДЖОЙСТИК ==========
         let touchStartPos = null, touchTimeout = null;
         canvas.addEventListener('touchstart', (e) => {
             if (!gameActive) return;
@@ -463,10 +463,11 @@
                     dayTime = 1 - dayTime;
                     if (dayTime === 0) { survivedNights++; zombies = []; }
                     else {
-                        for (let i = 0; i < 3; i++) {
-                            let x = Math.min(MAP_WIDTH - 1, Math.max(0, player.x + (Math.random() > 0.5 ? 3 : -3)));
-                            let y = Math.min(MAP_HEIGHT - 1, Math.max(0, player.y + (Math.random() > 0.5 ? 2 : -2)));
-                            zombies.push({ x, y, health: 20 });
+                        let count = Math.min(3 + Math.floor(survivedNights / 2), 8);
+                        for (let i = 0; i < count; i++) {
+                            let x = Math.min(MAP_WIDTH - 1, Math.max(0, player.x + (Math.random() > 0.5 ? 3 + Math.random() * 2 : -3 - Math.random() * 2)));
+                            let y = Math.min(MAP_HEIGHT - 1, Math.max(0, player.y + (Math.random() > 0.5 ? 2 + Math.random() * 2 : -2 - Math.random() * 2)));
+                            zombies.push({ x: Math.floor(x), y: Math.floor(y), health: 20 });
                         }
                     }
                     updateUI();
@@ -515,27 +516,34 @@
             }
         }, 100);
 
-        // ========== ОТРИСОВКА (НОРМАЛЬНЫЙ СТИВ) ==========
+        // ========== ИМБОВАЯ ОТРИСОВКА ==========
         function drawGame() {
             if (!ctx || !worldMap.length) return;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Блоки
             for (let row = 0; row < MAP_HEIGHT; row++) {
                 for (let col = 0; col < MAP_WIDTH; col++) {
                     let b = worldMap[row]?.[col];
                     if (!b) continue;
                     let x = col * TILE_SIZE, y = row * TILE_SIZE;
                     if (b.type === 0) {
+                        // Трава
                         ctx.fillStyle = '#5F7E4A';
                         ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
                         ctx.fillStyle = '#6F9E55';
                         ctx.fillRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+                        ctx.fillStyle = '#4A6E3A';
+                        for (let i = 0; i < 3; i++) {
+                            ctx.fillRect(x + 5 + i * 12, y + TILE_SIZE - 6, 3, 4);
+                        }
                     } else {
                         let s = blockStats[b.type];
                         ctx.fillStyle = s.color;
                         ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
                         ctx.fillStyle = s.lightColor;
                         ctx.fillRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
-                        ctx.fillStyle = 'white';
+                        ctx.fillStyle = '#FFFFFF';
                         ctx.font = `${TILE_SIZE * 0.5}px monospace`;
                         ctx.fillText(s.icon, x + TILE_SIZE * 0.25, y + TILE_SIZE * 0.7);
                         if (b.health < b.maxHealth) {
@@ -545,58 +553,150 @@
                     }
                 }
             }
+            
+            // Бонусный сундук
             if (bonusChest.active && worldMap[bonusChest.y]?.[bonusChest.x]?.type === 0) {
                 let x = bonusChest.x * TILE_SIZE, y = bonusChest.y * TILE_SIZE;
                 ctx.fillStyle = '#DAA520';
                 ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
                 ctx.fillStyle = '#FFD700';
-                ctx.fillText('🎁', x + TILE_SIZE * 0.25, y + TILE_SIZE * 0.7);
+                ctx.fillRect(x + 4, y + 4, TILE_SIZE - 8, TILE_SIZE - 8);
+                ctx.fillStyle = '#B8860B';
+                ctx.fillRect(x + 10, y + 15, TILE_SIZE - 20, 5);
+                ctx.fillStyle = '#FFD700';
+                ctx.font = `${TILE_SIZE * 0.45}px monospace`;
+                ctx.fillText('🎁', x + TILE_SIZE * 0.3, y + TILE_SIZE * 0.7);
                 ctx.fillStyle = '#FFAA44';
                 ctx.fillRect(x + 5, y + 2, (bonusChest.health / bonusChest.maxHealth) * (TILE_SIZE - 10), 4);
             }
-            // Стив (нормальный)
+            
+            // ========== СТИВ (ИМБОВЫЙ) ==========
             let px = player.x * TILE_SIZE, py = player.y * TILE_SIZE;
             let tool = getToolById(equippedToolId);
-            // Тело
-            ctx.fillStyle = "#4C7A4A";
-            ctx.fillRect(px + 6, py + 12, TILE_SIZE - 12, TILE_SIZE - 18);
+            
+            // Тень под ногами
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.fillRect(px + 8, py + TILE_SIZE - 8, TILE_SIZE - 16, 6);
+            
+            // Ноги
+            ctx.fillStyle = '#2C1E12';
+            ctx.fillRect(px + 10, py + TILE_SIZE - 14, 8, 12);
+            ctx.fillRect(px + TILE_SIZE - 18, py + TILE_SIZE - 14, 8, 12);
+            
+            // Тело (рубашка)
+            ctx.fillStyle = '#4C7A4A';
+            ctx.fillRect(px + 8, py + 16, TILE_SIZE - 16, TILE_SIZE - 28);
+            
             // Пояс
-            ctx.fillStyle = "#3B2F2A";
-            ctx.fillRect(px + 6, py + TILE_SIZE - 14, TILE_SIZE - 12, 6);
+            ctx.fillStyle = '#3B2F2A';
+            ctx.fillRect(px + 8, py + TILE_SIZE - 18, TILE_SIZE - 16, 6);
+            
+            // Руки
+            ctx.fillStyle = '#4C7A4A';
+            ctx.fillRect(px + 4, py + 20, 8, TILE_SIZE - 32);
+            ctx.fillRect(px + TILE_SIZE - 12, py + 20, 8, TILE_SIZE - 32);
+            
             // Голова
-            ctx.fillStyle = "#E0AA7A";
-            ctx.fillRect(px + 10, py + 4, TILE_SIZE - 20, TILE_SIZE - 24);
+            ctx.fillStyle = '#E0AA7A';
+            ctx.fillRect(px + 10, py + 4, TILE_SIZE - 20, TILE_SIZE - 28);
+            
             // Глаза
-            ctx.fillStyle = "#2E241F";
-            ctx.fillRect(px + 16, py + 10, 4, 4);
-            ctx.fillRect(px + TILE_SIZE - 20, py + 10, 4, 4);
+            ctx.fillStyle = '#2E241F';
+            ctx.fillRect(px + 16, py + 12, 5, 5);
+            ctx.fillRect(px + TILE_SIZE - 21, py + 12, 5, 5);
+            
+            // Зрачки (блики)
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(px + 17, py + 13, 2, 2);
+            ctx.fillRect(px + TILE_SIZE - 20, py + 13, 2, 2);
+            
+            // Рот (лёгкая улыбка)
+            ctx.fillStyle = '#5C3A1A';
+            ctx.fillRect(px + 18, py + 20, TILE_SIZE - 36, 3);
+            
             // Волосы
-            ctx.fillStyle = "#1F1408";
-            ctx.fillRect(px + 10, py + 2, TILE_SIZE - 20, 5);
-            // Кирка в руке
-            ctx.fillStyle = tool?.color || "#B57A3B";
-            ctx.fillRect(px + TILE_SIZE - 14, py + TILE_SIZE - 20, 8, 16);
-            // Зомби
+            ctx.fillStyle = '#1F1408';
+            ctx.fillRect(px + 8, py + 2, TILE_SIZE - 16, 7);
+            
+            // Кирка/меч в руке
+            if (currentWeaponMode === 'melee') {
+                ctx.fillStyle = tool?.color || '#B57A3B';
+                ctx.fillRect(px + TILE_SIZE - 12, py + TILE_SIZE - 22, 8, 18);
+                ctx.fillStyle = '#8B5A2B';
+                ctx.fillRect(px + TILE_SIZE - 10, py + TILE_SIZE - 26, 4, 8);
+            } else if (currentWeaponMode === 'bow') {
+                ctx.fillStyle = '#8B5A2B';
+                ctx.fillRect(px + TILE_SIZE - 14, py + TILE_SIZE - 24, 12, 5);
+                ctx.fillStyle = '#D2B48C';
+                ctx.fillRect(px + TILE_SIZE - 12, py + TILE_SIZE - 28, 8, 4);
+            } else if (currentWeaponMode === 'crossbow') {
+                ctx.fillStyle = '#6B4C3A';
+                ctx.fillRect(px + TILE_SIZE - 16, py + TILE_SIZE - 24, 14, 6);
+                ctx.fillStyle = '#8B5A2B';
+                ctx.fillRect(px + TILE_SIZE - 10, py + TILE_SIZE - 30, 6, 6);
+            }
+            
+            // ========== ЗОМБИ (ИМБОВЫЕ) ==========
             zombies.forEach(z => {
                 let zx = z.x * TILE_SIZE, zy = z.y * TILE_SIZE;
-                ctx.fillStyle = "#2F6B3A";
-                ctx.fillRect(zx + 4, zy + 8, TILE_SIZE - 8, TILE_SIZE - 12);
-                ctx.fillStyle = "#1F3A1A";
-                ctx.fillRect(zx + 12, zy + 4, TILE_SIZE - 24, 8);
-                ctx.fillStyle = "#000";
-                ctx.fillRect(zx + 14, zy + 16, 4, 4);
-                ctx.fillRect(zx + TILE_SIZE - 18, zy + 16, 4, 4);
-                ctx.fillStyle = "#AA0000";
+                
+                // Тень
+                ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                ctx.fillRect(zx + 8, zy + TILE_SIZE - 8, TILE_SIZE - 16, 6);
+                
+                // Ноги
+                ctx.fillStyle = '#2F6B3A';
+                ctx.fillRect(zx + 10, zy + TILE_SIZE - 14, 8, 12);
+                ctx.fillRect(zx + TILE_SIZE - 18, zy + TILE_SIZE - 14, 8, 12);
+                
+                // Тело
+                ctx.fillStyle = '#2F6B3A';
+                ctx.fillRect(zx + 8, zy + 16, TILE_SIZE - 16, TILE_SIZE - 28);
+                
+                // Лохмотья
+                ctx.fillStyle = '#1F3A1A';
+                ctx.fillRect(zx + 4, zy + 24, 6, 10);
+                ctx.fillRect(zx + TILE_SIZE - 10, zy + 24, 6, 10);
+                
+                // Голова
+                ctx.fillStyle = '#2F6B3A';
+                ctx.fillRect(zx + 10, zy + 4, TILE_SIZE - 20, TILE_SIZE - 28);
+                
+                // Глаза злые
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(zx + 16, zy + 12, 5, 5);
+                ctx.fillRect(zx + TILE_SIZE - 21, zy + 12, 5, 5);
+                
+                // Красные глаза (свечение)
+                ctx.fillStyle = '#FF0000';
+                ctx.fillRect(zx + 17, zy + 13, 3, 3);
+                ctx.fillRect(zx + TILE_SIZE - 20, zy + 13, 3, 3);
+                
+                // Кровавый рот
+                ctx.fillStyle = '#8B0000';
+                ctx.fillRect(zx + 18, zy + 20, TILE_SIZE - 36, 4);
+                ctx.fillStyle = '#AA0000';
+                ctx.fillRect(zx + 20, zy + 21, 3, 2);
+                ctx.fillRect(zx + TILE_SIZE - 23, zy + 21, 3, 2);
+                
+                // Полоска здоровья
+                ctx.fillStyle = '#AA0000';
                 ctx.fillRect(zx + 5, zy + 2, (z.health / 20) * (TILE_SIZE - 10), 4);
+                ctx.fillStyle = '#00AA00';
+                ctx.fillRect(zx + 5, zy + 2, (z.health / 20) * (TILE_SIZE - 10), 3);
             });
+            
+            // Плавающие тексты
             floatingMessages = floatingMessages.filter(m => { m.life -= 0.03; m.y -= 1; return m.life > 0; });
             floatingMessages.forEach(m => {
                 ctx.font = "bold 14px monospace";
                 ctx.fillStyle = m.color;
                 ctx.fillText(m.text, m.x - 20, m.y - 12);
             });
+            
+            // Ночное затемнение
             if (dayTime === 1) {
-                ctx.fillStyle = "rgba(0,0,40,0.5)";
+                ctx.fillStyle = "rgba(0,0,40,0.55)";
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
             }
         }
@@ -655,6 +755,7 @@
         document.getElementById('inventoryBtn')?.addEventListener('click', () => openInventory());
         document.getElementById('inventoryToggleBtn')?.addEventListener('click', () => openInventory());
         document.getElementById('closeInventoryBtn')?.addEventListener('click', () => closeInventory());
+        
         let nextBtn = document.getElementById('nextWeaponBtn');
         if (!nextBtn) {
             let btn = document.createElement('button');
