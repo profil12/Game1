@@ -4,7 +4,7 @@
         if (!canvas) { console.error("Canvas не найден!"); return; }
         const ctx = canvas.getContext('2d');
 
-        // ========== АДАПТАЦИЯ ПОД ЭКРАН ==========
+        // ========== РАЗМЕРЫ ==========
         let MAP_WIDTH = 16;
         let MAP_HEIGHT = 12;
         let TILE_SIZE = 50;
@@ -17,12 +17,9 @@
             canvas.height = MAP_HEIGHT * TILE_SIZE;
             canvas.style.width = '100%';
             canvas.style.height = 'auto';
-            canvas.style.display = 'block';
-            canvas.style.margin = '0 auto';
             if (worldMap.length) drawGame();
         }
         window.addEventListener('resize', resizeCanvas);
-        window.addEventListener('orientationchange', resizeCanvas);
 
         // ========== ПЕРЕМЕННЫЕ ==========
         let player = { x: 8, y: 6, health: 20, hunger: 16 };
@@ -32,7 +29,7 @@
         let gameActive = true;
         let deathReason = "";
 
-        // ========== ОРУЖИЕ И ИНСТРУМЕНТЫ ==========
+        // ========== ОРУЖИЕ ==========
         let currentWeaponMode = "melee";
         let weaponDamage = 3;
         let toolTier = 1;
@@ -56,7 +53,7 @@
         function getToolById(id) { return availableTools.find(t => t.id === id); }
         function hasWeapon(weaponId) { return availableWeapons.find(w => w.id === weaponId)?.crafted === true; }
 
-        // ========== МИР ==========
+        // ========== МИР С ВОЗРОЖДЕНИЕМ БЛОКОВ ==========
         let worldMap = [];
         let zombies = [];
         let dayTime = 0;
@@ -65,15 +62,14 @@
         let floatingMessages = [];
         let bonusChest = { active: false, x: 0, y: 0, spawnTimer: 60, health: 6, maxHealth: 6 };
 
-        // ========== СТАТЫ БЛОКОВ (с цветами и иконками) ==========
         const blockStats = {
-            1: { name: "дерево", baseHealth: 8, drops: { wood: 3 }, toolRequired: 1, icon: "🌲", color: "#5C3E1F", lightColor: "#7C5E2B" },
-            2: { name: "камень", baseHealth: 12, drops: { stone: 2 }, toolRequired: 2, icon: "🪨", color: "#6B6B6B", lightColor: "#8F8F8F" },
-            3: { name: "ягоды", baseHealth: 4, drops: { food: 4 }, toolRequired: 1, icon: "🍓", color: "#B3470C", lightColor: "#E05E1E" },
-            4: { name: "сундук", baseHealth: 6, drops: { random: true }, toolRequired: 1, icon: "📦", color: "#8B5A2B", lightColor: "#D4A373" },
-            5: { name: "уголь", baseHealth: 10, drops: { coal: 3 }, toolRequired: 2, icon: "⚫", color: "#3A3A3A", lightColor: "#1A1A1A" },
-            6: { name: "медь", baseHealth: 12, drops: { copper: 2 }, toolRequired: 2, icon: "🟤", color: "#B87333", lightColor: "#CD7F45" },
-            7: { name: "железо", baseHealth: 15, drops: { iron: 1 }, toolRequired: 3, icon: "⚙️", color: "#8C8C8C", lightColor: "#B0B0B0" }
+            1: { name: "дерево", baseHealth: 8, drops: { wood: 3 }, toolRequired: 1, icon: "🌲", color: "#5C3E1F", lightColor: "#7C5E2B", respawnDelay: 10000 },
+            2: { name: "камень", baseHealth: 12, drops: { stone: 2 }, toolRequired: 2, icon: "🪨", color: "#6B6B6B", lightColor: "#8F8F8F", respawnDelay: 12000 },
+            3: { name: "ягоды", baseHealth: 4, drops: { food: 4 }, toolRequired: 1, icon: "🍓", color: "#B3470C", lightColor: "#E05E1E", respawnDelay: 8000 },
+            4: { name: "сундук", baseHealth: 6, drops: { random: true }, toolRequired: 1, icon: "📦", color: "#8B5A2B", lightColor: "#D4A373", respawnDelay: null },
+            5: { name: "уголь", baseHealth: 10, drops: { coal: 3 }, toolRequired: 2, icon: "⚫", color: "#3A3A3A", lightColor: "#1A1A1A", respawnDelay: 14000 },
+            6: { name: "медь", baseHealth: 12, drops: { copper: 2 }, toolRequired: 2, icon: "🟤", color: "#B87333", lightColor: "#CD7F45", respawnDelay: 14000 },
+            7: { name: "железо", baseHealth: 15, drops: { iron: 1 }, toolRequired: 3, icon: "⚙️", color: "#8C8C8C", lightColor: "#B0B0B0", respawnDelay: 16000 }
         };
 
         const recipes = [
@@ -88,10 +84,10 @@
         ];
 
         function generateWorld() {
-            worldMap = Array(MAP_HEIGHT).fill().map(() => Array(MAP_WIDTH).fill().map(() => ({ type: 0, health: 0, maxHealth: 0 })));
+            worldMap = Array(MAP_HEIGHT).fill().map(() => Array(MAP_WIDTH).fill().map(() => ({ type: 0, health: 0, maxHealth: 0, respawnTimer: null })));
             function setBlock(type, x, y) {
                 if (worldMap[y][x].type === 0) {
-                    worldMap[y][x] = { type, health: blockStats[type].baseHealth, maxHealth: blockStats[type].baseHealth };
+                    worldMap[y][x] = { type, health: blockStats[type].baseHealth, maxHealth: blockStats[type].baseHealth, respawnTimer: null };
                     return true;
                 }
                 return false;
@@ -107,6 +103,18 @@
                 let x = 2 + Math.floor(Math.random() * (MAP_WIDTH - 4)), y = 2 + Math.floor(Math.random() * (MAP_HEIGHT - 4));
                 if (setBlock(4, x, y)) placed = true;
             }
+        }
+
+        function scheduleRespawn(x, y, blockType) {
+            const stats = blockStats[blockType];
+            if (!stats || !stats.respawnDelay) return;
+            const timeoutId = setTimeout(() => {
+                if (worldMap[y][x].type === 0) {
+                    worldMap[y][x] = { type: blockType, health: stats.baseHealth, maxHealth: stats.baseHealth, respawnTimer: null };
+                    drawGame();
+                }
+            }, stats.respawnDelay);
+            worldMap[y][x] = { type: 0, health: 0, maxHealth: 0, respawnTimer: timeoutId };
         }
 
         function updateUI() {
@@ -160,8 +168,31 @@
             document.getElementById('restartBtn').onclick = () => location.reload();
         }
 
+        // ========== АТАКА И ДОБЫЧА ==========
+        function attackOrHarvest() {
+            if (!gameActive) return;
+            let targetZombie = null;
+            for (let i = 0; i < zombies.length; i++) {
+                let z = zombies[i];
+                if (Math.abs(z.x - player.x) <= 1 && Math.abs(z.y - player.y) <= 1) {
+                    targetZombie = z;
+                    break;
+                }
+            }
+            if (targetZombie) {
+                targetZombie.health -= weaponDamage;
+                showFloatingText(`🗡️ ${weaponDamage}`, targetZombie.x, targetZombie.y, "#ffaa66");
+                if (targetZombie.health <= 0) {
+                    zombies = zombies.filter(z => z !== targetZombie);
+                    showFloatingText("☠️ Зомби убит", targetZombie.x, targetZombie.y, "#aaffaa");
+                }
+                drawGame();
+                return;
+            }
+            harvestBlock();
+        }
+
         function harvestBlock() {
-            if (!gameActive || !worldMap.length) return;
             let bx = player.x, by = player.y;
             
             if (bonusChest.active && bx === bonusChest.x && by === bonusChest.y) {
@@ -208,30 +239,17 @@
                         else { coal += 5; showFloatingText("🔥 +5 угля", bx, by, "#aaffaa"); }
                     }
                 }
-                worldMap[by][bx] = { type: 0, health: 0, maxHealth: 0 };
+                if (stats.respawnDelay) {
+                    scheduleRespawn(bx, by, block.type);
+                } else {
+                    worldMap[by][bx] = { type: 0, health: 0, maxHealth: 0, respawnTimer: null };
+                }
                 updateUI();
                 showFloatingText("✓ Сломано", bx, by, "#aaffaa");
             } else {
                 showFloatingText(`💥 ${damage} | ост: ${block.health}`, bx, by, "#ffaa66");
             }
             drawGame();
-        }
-
-        function meleeAttackZombie() {
-            for (let i = 0; i < zombies.length; i++) {
-                let z = zombies[i];
-                if (Math.abs(z.x - player.x) <= 1 && Math.abs(z.y - player.y) <= 1) {
-                    z.health -= weaponDamage;
-                    showFloatingText(`🗡️ ${weaponDamage}`, z.x, z.y, "#ffaa66");
-                    if (z.health <= 0) {
-                        zombies.splice(i, 1);
-                        showFloatingText("☠️ Зомби убит", z.x, z.y, "#aaffaa");
-                    }
-                    drawGame();
-                    return true;
-                }
-            }
-            return false;
         }
 
         function rangedAttack(tileX, tileY) {
@@ -268,24 +286,6 @@
             return true;
         }
 
-        function onTapTile(tileX, tileY) {
-            for (let z of zombies) {
-                if (z.x === tileX && z.y === tileY) {
-                    if (currentWeaponMode !== "melee") {
-                        rangedAttack(tileX, tileY);
-                    } else {
-                        if (Math.abs(player.x - tileX) <= 1 && Math.abs(player.y - tileY) <= 1) {
-                            meleeAttackZombie();
-                        } else {
-                            showFloatingText("❌ Подойди ближе", player.x, player.y, "#ff8888");
-                        }
-                    }
-                    return;
-                }
-            }
-            harvestBlock();
-        }
-
         function smelt() {
             if (!gameActive) return;
             if (coal > 0 && copper >= 2) {
@@ -294,16 +294,15 @@
                 coal--;
                 showFloatingText("⚙️ Железо выплавлено!", player.x, player.y, "#aaffaa");
                 updateUI();
-                drawGame();
             } else if (coal > 0 && copper >= 1) {
                 copper--;
                 showFloatingText("🟤 Медь переплавлена, нужно 2 для железа", player.x, player.y, "#ccccaa");
                 coal--;
                 updateUI();
-                drawGame();
             } else {
                 showFloatingText(coal > 0 ? "❌ Нет руды!" : "❌ Нет угля!", player.x, player.y, "#ff8888");
             }
+            drawGame();
         }
 
         // ========== ИНВЕНТАРЬ ==========
@@ -392,84 +391,68 @@
             return false;
         }
 
-        // ========== ТЕЛЕФОН: ДЖОЙСТИК ==========
-        let joystickActive = false;
-        let joystickCenter = { x: 0, y: 0 };
-        let joystickBase = null;
-        let joystickThumb = null;
+        // ========== ТЕЛЕФОН: КАСАНИЯ ==========
         let touchStartPos = null;
         let touchTimeout = null;
 
-        function initJoystick() {
-            const container = document.createElement('div');
-            container.id = 'joystickContainer';
-            container.style.cssText = `position:fixed;width:120px;height:120px;z-index:1500;display:none;touch-action:none;left:20px;bottom:100px;`;
-            joystickBase = document.createElement('div');
-            joystickBase.style.cssText = `width:100%;height:100%;background:rgba(30,30,40,0.75);border-radius:999px;border:2px solid #ffd966;display:flex;justify-content:center;align-items:center;`;
-            joystickThumb = document.createElement('div');
-            joystickThumb.style.cssText = `width:50px;height:50px;background:#f5e2b0;border-radius:999px;`;
-            joystickBase.appendChild(joystickThumb);
-            container.appendChild(joystickBase);
-            document.body.appendChild(container);
-
-            canvas.addEventListener('touchstart', (e) => {
-                if (!gameActive) return;
-                e.preventDefault();
-                const touch = e.touches[0];
-                const rect = canvas.getBoundingClientRect();
-                const scaleX = canvas.width / rect.width;
-                const scaleY = canvas.height / rect.height;
-                let canvasX = (touch.clientX - rect.left) * scaleX;
-                let canvasY = (touch.clientY - rect.top) * scaleY;
-                let tileX = Math.floor(canvasX / TILE_SIZE);
-                let tileY = Math.floor(canvasY / TILE_SIZE);
-                
-                touchStartPos = { x: touch.clientX, y: touch.clientY, tileX, tileY };
-                touchTimeout = setTimeout(() => {
-                    container.style.display = 'block';
-                    const rectC = container.getBoundingClientRect();
-                    joystickCenter.x = rectC.left + rectC.width / 2;
-                    joystickCenter.y = rectC.top + rectC.height / 2;
-                    joystickActive = true;
-                    moveDirection = { x: 0, y: 0 };
-                }, 200);
-            });
-
-            canvas.addEventListener('touchmove', (e) => {
-                if (!touchStartPos || !gameActive) return;
-                e.preventDefault();
-                const touch = e.touches[0];
-                let dx = touch.clientX - touchStartPos.x;
-                let dy = touch.clientY - touchStartPos.y;
-                if (Math.abs(dx) > 15 || Math.abs(dy) > 15) {
-                    if (touchTimeout) clearTimeout(touchTimeout);
-                    if (joystickActive) {
-                        let angle = Math.atan2(dy, dx);
-                        let dist = Math.min(Math.hypot(dx, dy), 50);
-                        let offsetX = Math.cos(angle) * dist;
-                        let offsetY = Math.sin(angle) * dist;
-                        joystickThumb.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
-                        moveDirection.x = Math.cos(angle) * (dist / 50);
-                        moveDirection.y = Math.sin(angle) * (dist / 50);
-                    }
-                    touchStartPos = null;
-                }
-            });
-
-            canvas.addEventListener('touchend', () => {
-                if (touchTimeout) {
-                    clearTimeout(touchTimeout);
-                    if (touchStartPos && gameActive) {
-                        onTapTile(touchStartPos.tileX, touchStartPos.tileY);
-                    }
-                }
-                joystickActive = false;
-                container.style.display = 'none';
-                moveDirection = { x: 0, y: 0 };
-                if (joystickThumb) joystickThumb.style.transform = 'translate(0px, 0px)';
+        canvas.addEventListener('touchstart', (e) => {
+            if (!gameActive) return;
+            e.preventDefault();
+            const touch = e.touches[0];
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            let canvasX = (touch.clientX - rect.left) * scaleX;
+            let canvasY = (touch.clientY - rect.top) * scaleY;
+            let tileX = Math.floor(canvasX / TILE_SIZE);
+            let tileY = Math.floor(canvasY / TILE_SIZE);
+            
+            touchStartPos = { x: touch.clientX, y: touch.clientY, tileX, tileY };
+            touchTimeout = setTimeout(() => {
+                moveDirection = { x: 0.5, y: 0.5 };
                 touchStartPos = null;
-            });
-        }
+            }, 200);
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            if (!touchStartPos) return;
+            e.preventDefault();
+            const touch = e.touches[0];
+            let dx = touch.clientX - touchStartPos.x;
+            let dy = touch.clientY - touchStartPos.y;
+            if (Math.abs(dx) > 15 || Math.abs(dy) > 15) {
+                if (touchTimeout) clearTimeout(touchTimeout);
+                let angle = Math.atan2(dy, dx);
+                moveDirection.x = Math.cos(angle);
+                moveDirection.y = Math.sin(angle);
+                touchStartPos = null;
+            }
+        });
+
+        canvas.addEventListener('touchend', () => {
+            if (touchTimeout) {
+                clearTimeout(touchTimeout);
+                if (touchStartPos && gameActive) {
+                    let targetZombieHit = false;
+                    for (let z of zombies) {
+                        if (z.x === touchStartPos.tileX && z.y === touchStartPos.tileY) {
+                            if (currentWeaponMode !== "melee") {
+                                rangedAttack(touchStartPos.tileX, touchStartPos.tileY);
+                            } else {
+                                attackOrHarvest();
+                            }
+                            targetZombieHit = true;
+                            break;
+                        }
+                    }
+                    if (!targetZombieHit) {
+                        attackOrHarvest();
+                    }
+                }
+            }
+            moveDirection = { x: 0, y: 0 };
+            touchStartPos = null;
+        });
 
         function updateMovement() {
             if (!gameActive) return;
@@ -485,7 +468,7 @@
             requestAnimationFrame(updateMovement);
         }
 
-        // ========== КЛАВИАТУРА ПК ==========
+        // ========== КЛАВИАТУРА ==========
         let keys = {};
         window.addEventListener('keydown', (e) => {
             if (!gameActive) return;
@@ -495,7 +478,7 @@
                 keys[k] = true;
                 updateKeyboardMovement();
             }
-            if (k === ' ' || k === 'e') { e.preventDefault(); harvestBlock(); }
+            if (k === ' ' || k === 'e') { e.preventDefault(); attackOrHarvest(); }
             if (k === 'i') { e.preventDefault(); openInventory(); }
         });
         window.addEventListener('keyup', (e) => { let k = e.key.toLowerCase(); delete keys[k]; updateKeyboardMovement(); });
@@ -540,13 +523,26 @@
                 if (!bonusChest.active) {
                     bonusChest.spawnTimer--;
                     if (bonusChest.spawnTimer <= 0) {
-                        bonusChest.active = true;
-                        bonusChest.x = Math.floor(Math.random() * (MAP_WIDTH - 2)) + 1;
-                        bonusChest.y = Math.floor(Math.random() * (MAP_HEIGHT - 2)) + 1;
-                        bonusChest.health = 6;
-                        bonusChest.maxHealth = 6;
-                        bonusChest.spawnTimer = 60;
-                        showFloatingText("✨ Бонусный сундук появился!", bonusChest.x, bonusChest.y, "#ffaa44");
+                        let freeCells = [];
+                        for (let i = 0; i < MAP_HEIGHT; i++) {
+                            for (let j = 0; j < MAP_WIDTH; j++) {
+                                if (worldMap[i][j].type === 0 && !(player.x === j && player.y === i)) {
+                                    freeCells.push({ x: j, y: i });
+                                }
+                            }
+                        }
+                        if (freeCells.length > 0) {
+                            let pos = freeCells[Math.floor(Math.random() * freeCells.length)];
+                            bonusChest.active = true;
+                            bonusChest.x = pos.x;
+                            bonusChest.y = pos.y;
+                            bonusChest.health = 6;
+                            bonusChest.maxHealth = 6;
+                            bonusChest.spawnTimer = 60;
+                            showFloatingText("✨ Бонусный сундук появился!", bonusChest.x, bonusChest.y, "#ffaa44");
+                        } else {
+                            bonusChest.spawnTimer = 10;
+                        }
                         updateUI();
                     }
                 }
@@ -580,7 +576,7 @@
                     } else {
                         let newX = z.x + dx;
                         let newY = z.y + dy;
-                        if (newX >= 0 && newX < MAP_WIDTH && newY >= 0 && newY < MAP_HEIGHT) {
+                        if (newX >= 0 && newX < MAP_WIDTH && newY >= 0 && newY < MAP_HEIGHT && worldMap[newY][newX].type === 0) {
                             z.x = newX;
                             z.y = newY;
                         }
@@ -592,7 +588,7 @@
             requestAnimationFrame(gameLoop);
         }
 
-        // ========== ОТРИСОВКА (КРАСИВАЯ) ==========
+        // ========== ОТРИСОВКА ==========
         function drawGame() {
             if (!ctx || !worldMap.length) return;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -724,7 +720,7 @@
 
         // ========== КНОПКИ ==========
         const actionBtn = document.getElementById('actionBtn');
-        if (actionBtn) actionBtn.onclick = () => harvestBlock();
+        if (actionBtn) actionBtn.onclick = () => attackOrHarvest();
         const furnaceBtn = document.getElementById('furnaceBtn');
         if (furnaceBtn) furnaceBtn.onclick = () => smelt();
         const inventoryBtn = document.getElementById('inventoryBtn');
@@ -770,7 +766,6 @@
         renderCrafting();
         updateUI();
         resizeCanvas();
-        initJoystick();
         updateMovement();
         gameLoop();
         window.addEventListener('resize', resizeCanvas);
