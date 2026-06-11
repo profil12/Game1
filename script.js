@@ -1,5 +1,5 @@
 (function() {
-    // Ждём полной загрузки DOM
+    // Ждём загрузки страницы
     document.addEventListener('DOMContentLoaded', () => {
         const canvas = document.getElementById('gameCanvas');
         if (!canvas) {
@@ -41,7 +41,6 @@
         ];
 
         function getToolById(id) { return availableTools.find(t => t.id === id); }
-        function getWeaponById(id) { return availableWeapons.find(w => w.id === id); }
 
         // Мир и зомби
         let worldMap = [];
@@ -109,8 +108,8 @@
             if (get('arrowCount')) get('arrowCount').innerHTML = arrows;
             let tool = getToolById(equippedToolId);
             if (get('toolLevel')) get('toolLevel').innerHTML = tool ? tool.name : "Деревянная";
-            let weapon = availableWeapons.find(w => w.id === (currentWeaponMode === 'melee' ? 'melee_default' : currentWeaponMode));
-            if (get('weaponName')) get('weaponName').innerHTML = weapon ? weapon.name : "Кирка";
+            let weaponName = currentWeaponMode === 'melee' ? 'Кирка' : (currentWeaponMode === 'bow' ? 'Лук' : 'Арбалет');
+            if (get('weaponName')) get('weaponName').innerHTML = weaponName;
             if (get('timeLeft')) get('timeLeft').innerHTML = (45 - cycleSeconds) + "с";
             if (get('dayIcon')) get('dayIcon').innerHTML = dayTime === 0 ? "🌞" : "🌙";
             if (get('dayPhase')) get('dayPhase').innerHTML = dayTime === 0 ? "День" : "Ночь";
@@ -284,7 +283,8 @@
                         let isEquipped = (currentWeaponMode === 'melee' && weapon.id === 'melee_default') ||
                                          (currentWeaponMode === weapon.id);
                         if (isEquipped) slot.classList.add('equipped');
-                        slot.innerHTML = `<div class="inv-slot-icon">${weapon.id === 'melee_default' ? '⛏️' : (weapon.id === 'copper_sword' ? '🗡️' : (weapon.id === 'iron_sword' ? '⚔️' : (weapon.id === 'bow' ? '🏹' : '🎯')))}</div><div class="inv-slot-name">${weapon.name}</div><div class="inv-slot-damage">${weapon.damage} урона</div>`;
+                        let icon = weapon.id === 'melee_default' ? '⛏️' : (weapon.id === 'copper_sword' ? '🗡️' : (weapon.id === 'iron_sword' ? '⚔️' : (weapon.id === 'bow' ? '🏹' : '🎯')));
+                        slot.innerHTML = `<div class="inv-slot-icon">${icon}</div><div class="inv-slot-name">${weapon.name}</div><div class="inv-slot-damage">${weapon.damage} урона</div>`;
                         slot.onclick = () => {
                             if (weapon.id === 'melee_default') {
                                 currentWeaponMode = 'melee';
@@ -311,8 +311,8 @@
             if (eqTool) eqTool.innerHTML = getToolById(equippedToolId)?.name || "Деревянная";
             const eqWeapon = document.getElementById('equippedWeapon');
             if (eqWeapon) {
-                let weapon = availableWeapons.find(w => w.id === (currentWeaponMode === 'melee' ? 'melee_default' : currentWeaponMode));
-                eqWeapon.innerHTML = weapon ? weapon.name : "Кирка";
+                let weaponName = currentWeaponMode === 'melee' ? 'Кирка' : (currentWeaponMode === 'bow' ? 'Лук' : 'Арбалет');
+                eqWeapon.innerHTML = weaponName;
             }
             modal.style.display = 'flex';
         }
@@ -636,43 +636,46 @@
             });
         }
 
-        // Подключаем кнопки с проверкой существования
+        // Кнопки (все с проверкой)
         const actionBtn = document.getElementById('actionBtn');
         if (actionBtn) actionBtn.onclick = () => harvestBlock();
+        
         const furnaceBtn = document.getElementById('furnaceBtn');
         if (furnaceBtn) furnaceBtn.onclick = () => smelt();
+        
         const inventoryBtn = document.getElementById('inventoryBtn');
         if (inventoryBtn) inventoryBtn.onclick = () => openInventory();
+        
         const inventoryToggle = document.getElementById('inventoryToggleBtn');
         if (inventoryToggle) inventoryToggle.onclick = () => openInventory();
+        
         const closeInv = document.getElementById('closeInventoryBtn');
         if (closeInv) closeInv.onclick = () => closeInventory();
 
         // Создаём кнопку смены оружия, если её нет
-        if (!document.getElementById('nextWeaponBtn')) {
+        let nextWeaponBtn = document.getElementById('nextWeaponBtn');
+        if (!nextWeaponBtn) {
             const weaponBtn = document.createElement('button');
             weaponBtn.id = 'nextWeaponBtn';
             weaponBtn.className = 'action-btn';
             weaponBtn.innerHTML = '🗡️ Сменить оружие';
             const actionsDiv = document.querySelector('.action-buttons');
             if (actionsDiv) actionsDiv.appendChild(weaponBtn);
+            nextWeaponBtn = document.getElementById('nextWeaponBtn');
         }
-        const nextWeaponBtn = document.getElementById('nextWeaponBtn');
         if (nextWeaponBtn) {
             nextWeaponBtn.onclick = () => {
                 const weapons = ['melee', 'bow', 'crossbow'];
                 let idx = weapons.indexOf(currentWeaponMode);
                 idx = (idx + 1) % weapons.length;
                 currentWeaponMode = weapons[idx];
-                let weapon = availableWeapons.find(w => w.id === (currentWeaponMode === 'melee' ? 'melee_default' : currentWeaponMode));
-                if (weapon) weaponDamage = weapon.damage;
                 let name = currentWeaponMode === 'melee' ? 'Кирка/меч' : (currentWeaponMode === 'bow' ? 'Лук' : 'Арбалет');
                 showFloatingText(`⚔️ ${name}`, player.x, player.y, "#aaffaa");
                 updateUI();
             };
         }
 
-        // Запуск игры
+        // ЗАПУСК ИГРЫ
         generateWorld();
         renderCrafting();
         updateUI();
